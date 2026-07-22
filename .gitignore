@@ -1,0 +1,44 @@
+# Build and test output
+bin/
+obj/
+artifacts/
+dist/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# IDE and user state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local runtime data and diagnostics
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.tmp
+*.bak
+
+# Authentication and secrets
+auth.json
+**/auth.json
+.env
+.env.*
+*secret*
+*.pfx
+*.p12
+*.snk
+*.pem
+*.key
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

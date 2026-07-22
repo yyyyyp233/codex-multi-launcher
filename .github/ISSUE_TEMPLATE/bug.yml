@@ -1,0 +1,50 @@
+name: Bug report
+description: 报告可复现的问题；请先移除所有凭据和个人信息。
+title: '[Bug] '
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请勿上传 auth.json、API Key、完整 Codex Home、任务数据库、浏览器目录或未脱敏完整日志。
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 1.5.0-preview.1 / commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows 版本、.NET SDK、Codex App 版本；不要包含用户名和完整绝对路径。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: 使用占位端点和脱敏名称描述最小复现。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: 仅粘贴最小、脱敏后的错误信息。
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Sensitive-data check
+      options:
+        - label: 我已确认内容不含 API Key、Token、内部域名、用户名、完整本机路径或第三方二进制。
+          required: true

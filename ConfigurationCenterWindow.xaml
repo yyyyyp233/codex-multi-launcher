@@ -1,0 +1,707 @@
+<Window x:Class="CodexChannelLauncher.ConfigurationCenterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Codex 多开器 · 工作空间配置"
+        Width="1080"
+        Height="760"
+        MinWidth="960"
+        MinHeight="680"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="Transparent"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        SourceInitialized="Window_SourceInitialized">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="58"
+                            ResizeBorderThickness="6"
+                            GlassFrameThickness="0"
+                            CornerRadius="18"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#E8141924" />
+        <SolidColorBrush x:Key="PanelStrokeBrush" Color="#30384B" />
+        <SolidColorBrush x:Key="InputBrush" Color="#111621" />
+
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#F0F2F8" />
+        </Style>
+
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#8792A8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="LineHeight" Value="17" />
+        </Style>
+
+        <Style x:Key="InputTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource InputBrush}" />
+            <Setter Property="Foreground" Value="#E3E7F0" />
+            <Setter Property="CaretBrush" Value="#C8BEFF" />
+            <Setter Property="BorderBrush" Value="#30384B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="11,8" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="SelectionBrush" Value="#6757B8" />
+        </Style>
+
+        <Style x:Key="InputComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Background" Value="{StaticResource InputBrush}" />
+            <Setter Property="Foreground" Value="#E3E7F0" />
+            <Setter Property="BorderBrush" Value="#30384B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="ConfigListBox" TargetType="ListBox">
+            <Setter Property="Background" Value="#8C0E131D" />
+            <Setter Property="BorderBrush" Value="#293143" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="#DDE2EC" />
+            <Setter Property="Padding" Value="11,9" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="ItemBorder"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#171D2A" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#28223F" />
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#5B4E8B" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#929CB1" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="15,9" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabChrome"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}"
+                                Margin="2,0">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabChrome" Property="Background" Value="#171C28" />
+                                <Setter Property="Foreground" Value="#D9DEEA" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabChrome" Property="Background" Value="#2B2542" />
+                                <Setter Property="Foreground" Value="#D1C9FF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PanelCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="18" />
+        </Style>
+    </Window.Resources>
+
+    <Border CornerRadius="18" BorderBrush="#444C62" BorderThickness="1" Background="#0B0E16">
+        <Grid x:Name="RootContent" Opacity="0" ClipToBounds="True">
+            <Grid.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#111528" Offset="0" />
+                    <GradientStop Color="#0B0E16" Offset="0.48" />
+                    <GradientStop Color="#161020" Offset="1" />
+                </LinearGradientBrush>
+            </Grid.Background>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="58" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="54" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" BorderBrush="#232A3B" BorderThickness="0,0,0,1">
+                <Grid Margin="20,0,13,0" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="30" Height="30" CornerRadius="10" VerticalAlignment="Center">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#CBBFFF" Offset="0" />
+                                <GradientStop Color="#6F5BD7" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock Text="⚙" Foreground="#11131B" FontSize="15"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="工作空间配置中心" FontFamily="{StaticResource DisplayFont}"
+                                   FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="个人 / 工作空间隔离配置与显式双向合并" FontSize="10.5"
+                                   Foreground="#7D879D" Margin="0,2,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button Style="{StaticResource WindowButton}" Content="—" Click="MinimizeButton_Click" />
+                        <Button Style="{StaticResource WindowButton}" Content="×" Margin="5,0,0,0" Click="CloseButton_Click" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1" Margin="24,18,24,12" Padding="15,11" CornerRadius="14"
+                    Background="#B6131823" BorderBrush="#30384B" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse x:Name="ProfileStateDot" Width="8" Height="8" Fill="#F3C777" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Margin="11,0,0,0">
+                        <TextBlock x:Name="ProfileStateText" Text="正在读取工作空间配置"
+                                   FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ProfilePathText" Text="%LOCALAPPDATA%\CodexChannelLauncher"
+                                   FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#737E95" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button Style="{StaticResource SecondaryButton}" Height="36"
+                                Content="编辑连接" Click="EditWorkProfileButton_Click" />
+                        <Button Style="{StaticResource SecondaryButton}" Height="36" Margin="9,0,0,0"
+                                Content="打开配置目录" Click="OpenCompanyFolderButton_Click" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <TabControl Grid.Row="2" Margin="24,0,24,0" Background="Transparent" BorderThickness="0">
+                <TabItem Header="总览">
+                    <Grid Margin="4,15,4,4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource PanelCard}">
+                                <StackPanel>
+                                    <TextBlock Text="SKILLS" Foreground="#7F89A0" FontSize="10" FontWeight="Bold" />
+                                    <TextBlock x:Name="OverviewSkillCountText" Text="—" FontSize="25" FontWeight="SemiBold" Margin="0,7,0,0" />
+                                    <TextBlock Text="支持个人 / 工作空间双向 Diff 与采用" Style="{StaticResource HintText}" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                                <StackPanel>
+                                    <TextBlock Text="MCP SERVERS" Foreground="#7F89A0" FontSize="10" FontWeight="Bold" />
+                                    <TextBlock x:Name="OverviewMcpCountText" Text="—" FontSize="25" FontWeight="SemiBold" Margin="0,7,0,0" />
+                                    <TextBlock Text="密钥、静态 Header 与 OAuth 不迁移" Style="{StaticResource HintText}" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="4" Style="{StaticResource PanelCard}">
+                                <StackPanel>
+                                    <TextBlock Text="SNAPSHOTS" Foreground="#7F89A0" FontSize="10" FontWeight="Bold" />
+                                    <TextBlock x:Name="OverviewSnapshotCountText" Text="—" FontSize="25" FontWeight="SemiBold" Margin="0,7,0,0" />
+                                    <TextBlock Text="每次变更前自动保存，最多保留十份" Style="{StaticResource HintText}" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource PanelCard}">
+                                <StackPanel>
+                                    <TextBlock Text="能力状态" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock x:Name="OverviewChromeText" Text="Chrome · 检测中" Margin="0,18,0,0" FontSize="13" />
+                                    <TextBlock x:Name="OverviewComputerText" Text="电脑操作 · 检测中" Margin="0,12,0,0" FontSize="13" />
+                                    <TextBlock Text="两种能力可在个人与工作空间实例同时启用，但本机 Chrome 和 Windows 前台桌面仍是共享资源。"
+                                               Style="{StaticResource HintText}" Margin="0,18,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                                <StackPanel>
+                                    <TextBlock Text="权限状态" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock x:Name="OverviewPermissionText" Text="检测中" Margin="0,18,0,0" FontSize="13" />
+                                    <TextBlock x:Name="OverviewMemoryText" Text="Memories · 检测中" Margin="0,12,0,0" FontSize="13" />
+                                    <Border x:Name="FullAccessWarning" Visibility="Collapsed" Margin="0,18,0,0"
+                                            Padding="12,9" CornerRadius="10" Background="#31201E" BorderBrush="#6C443C" BorderThickness="1">
+                                        <TextBlock Text="当前为 Full Access：never + danger-full-access。"
+                                                   Foreground="#F0B39F" FontSize="11" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Skills">
+                    <Grid Margin="4,15,4,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="300" />
+                        </Grid.ColumnDefinitions>
+                        <ListBox x:Name="SkillList" Style="{StaticResource ConfigListBox}" SelectionChanged="SkillList_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="130" />
+                                            <ColumnDefinition Width="115" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12.5" />
+                                            <TextBlock Text="{Binding SizeText}" Foreground="#727D93" FontSize="10" Margin="0,4,0,0" />
+                                            <TextBlock Text="{Binding DiffText}" Foreground="#606B81" FontSize="9.5" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="#AFA5F0"
+                                                   VerticalAlignment="Center" FontSize="11" />
+                                        <TextBlock Grid.Column="2" Text="{Binding CompanyEnabled, StringFormat=工作空间启用：{0}}"
+                                                   Foreground="#8792A8" VerticalAlignment="Center" FontSize="10.5" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                            <StackPanel>
+                                <TextBlock Text="Skills 管理" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="所选 Skill 按完整包双向采用：来源版本会替换目标版本。操作前必须退出两个 App，并自动快照目标侧。"
+                                           Style="{StaticResource HintText}" Margin="0,12,0,0" />
+                                <TextBlock x:Name="SelectedSkillText" Text="尚未选择 Skill" Margin="0,22,0,0"
+                                           FontSize="13" FontWeight="SemiBold" />
+                                <Button x:Name="OpenSkillMergeWorkbenchButton" Style="{StaticResource PrimaryButton}" Height="42"
+                                        Content="打开逐块 Diff / Merge" Margin="0,20,0,0" IsEnabled="False"
+                                        Click="OpenSkillMergeWorkbenchButton_Click" />
+                                <Button x:Name="ImportSkillButton" Style="{StaticResource SecondaryButton}" Height="42"
+                                        Content="个人 → 工作空间：采用个人版本" Margin="0,10,0,0" IsEnabled="False"
+                                        Click="ImportSkillButton_Click" />
+                                <Button x:Name="ExportSkillButton" Style="{StaticResource SecondaryButton}" Height="42"
+                                        Content="工作空间 → 个人：采用工作空间版本" Margin="0,10,0,0" IsEnabled="False"
+                                        Click="ExportSkillButton_Click" />
+                                <Button x:Name="ToggleSkillButton" Style="{StaticResource SecondaryButton}" Height="42"
+                                        Content="切换工作空间启用状态" Margin="0,10,0,0" IsEnabled="False"
+                                        Click="ToggleSkillButton_Click" />
+                                <TextBlock Text=".system 与插件自带 Skills 不参与 Diff / Merge。启停配置只影响工作空间 App。"
+                                           Style="{StaticResource HintText}" Margin="0,18,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="全局规则">
+                    <Grid Margin="4,15,4,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="330" />
+                        </Grid.ColumnDefinitions>
+                        <ListBox x:Name="GlobalRuleList" Style="{StaticResource ConfigListBox}"
+                                 SelectionChanged="GlobalRuleList_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="125" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding FileName}" FontFamily="Cascadia Mono, Consolas"
+                                                           FontWeight="SemiBold" FontSize="12.5" />
+                                                <TextBlock Text="{Binding PriorityText}" Foreground="#8D82D2"
+                                                           FontSize="9.5" Margin="10,2,0,0" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding SizeText}" Foreground="#727D93"
+                                                       FontSize="10" Margin="0,5,0,0" />
+                                            <TextBlock Text="{Binding EffectiveText}" Foreground="#606B81"
+                                                       FontSize="9.5" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="#AFA5F0"
+                                                   VerticalAlignment="Center" FontSize="11" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                            <StackPanel>
+                                <TextBlock Text="全局规则管理" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="只管理两个 CODEX_HOME 根文件：非空 AGENTS.override.md 优先；否则使用 AGENTS.md。项目目录与外部路由文件不在此处修改。"
+                                           Style="{StaticResource HintText}" Margin="0,12,0,0" />
+                                <TextBlock x:Name="SelectedGlobalRuleText" Text="尚未选择规则文件"
+                                           Margin="0,22,0,0" FontSize="13" FontWeight="SemiBold" />
+                                <Button x:Name="OpenGlobalRuleMergeWorkbenchButton"
+                                        Style="{StaticResource PrimaryButton}" Height="42"
+                                        Content="打开逐块 Diff / Merge" Margin="0,20,0,0" IsEnabled="False"
+                                        Click="OpenGlobalRuleMergeWorkbenchButton_Click" />
+                                <Button x:Name="MergeGlobalRuleToCompanyButton"
+                                        Style="{StaticResource SecondaryButton}" Height="42"
+                                        Content="个人 → 工作空间：采用个人版本" Margin="0,10,0,0" IsEnabled="False"
+                                        Click="MergeGlobalRuleToCompanyButton_Click" />
+                                <Button x:Name="MergeGlobalRuleToPersonalButton"
+                                        Style="{StaticResource SecondaryButton}" Height="42"
+                                        Content="工作空间 → 个人：采用工作空间版本" Margin="0,10,0,0" IsEnabled="False"
+                                        Click="MergeGlobalRuleToPersonalButton_Click" />
+                                <TextBlock Text="逐块保存或整文件采用前必须退出两个 App，并自动快照目标侧。规则会在重新启动或新建任务后重新发现。"
+                                           Style="{StaticResource HintText}" Margin="0,18,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Memories">
+                    <Grid Margin="4,15,4,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource PanelCard}">
+                            <StackPanel>
+                                <TextBlock Text="快速合并 / 同步" Style="{StaticResource SectionTitle}" />
+                                <TextBlock x:Name="MemoryStatusText" Text="正在计算文件清单" Margin="0,15,0,0" FontSize="13" />
+                                <TextBlock x:Name="MemorySizeText" Text="—" Style="{StaticResource HintText}" Margin="0,7,0,0" />
+                                <TextBlock x:Name="MemoryDiffText" Text="—" Style="{StaticResource HintText}" Margin="0,5,0,0" />
+                                <Border Margin="0,20,0,0" Padding="13" CornerRadius="12" Background="#161B27"
+                                        BorderBrush="#30384B" BorderThickness="1">
+                                    <TextBlock Text="合并只处理可迁移记忆文件，排除 .git、.agents 与运行时临时文件。同路径冲突采用箭头左侧来源，目标侧独有文件保留；操作前必须退出两个 App。"
+                                               Style="{StaticResource HintText}" />
+                                </Border>
+                                <Button x:Name="MergeMemoriesToCompanyButton" Style="{StaticResource SecondaryButton}"
+                                        Height="42" Margin="0,22,0,0" IsEnabled="False"
+                                        Content="个人 → 工作空间：合并 Memories" Click="MergeMemoriesToCompanyButton_Click" />
+                                <Button x:Name="MergeMemoriesToPersonalButton" Style="{StaticResource SecondaryButton}"
+                                        Height="42" Margin="0,10,0,0" IsEnabled="False"
+                                        Content="工作空间 → 个人：合并 Memories" Click="MergeMemoriesToPersonalButton_Click" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                            <StackPanel>
+                                <TextBlock Text="记忆策略" Style="{StaticResource SectionTitle}" />
+                                <Grid Margin="0,20,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="启用 Memories 功能" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="MemoryFeatureToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                </Grid>
+                                <Grid Margin="0,15,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="在新任务中使用已有记忆" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="UseMemoriesToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                </Grid>
+                                <Grid Margin="0,15,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="允许从新任务生成记忆" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="GenerateMemoriesToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                </Grid>
+                                <Grid Margin="0,15,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="使用外部上下文时禁止生成" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="ExternalContextToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                </Grid>
+                                <Button Style="{StaticResource PrimaryButton}" Height="42" Margin="0,24,0,0"
+                                        Content="保存记忆策略" Click="SaveMemorySettingsButton_Click" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Chrome / 电脑">
+                    <ScrollViewer Margin="4,15,4,4" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <Border x:Name="CapabilityEditNotice"
+                                    Background="#2A241C"
+                                    BorderBrush="#5D4A2A"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="14,11"
+                                    Margin="0,0,0,16"
+                                    Visibility="Collapsed">
+                                <TextBlock Text="工作空间 App 正在运行。请先退出工作空间 App 并刷新，再修改插件开关或应用白名单；个人 App 不受影响。"
+                                           Foreground="#F3C777"
+                                           TextWrapping="Wrap" />
+                            </Border>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource PanelCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="Chrome 操作" Style="{StaticResource SectionTitle}" />
+                                        <TextBlock x:Name="ChromeInstallText" Text="检测插件状态" Style="{StaticResource HintText}" Margin="0,10,0,0" />
+                                        <Grid Margin="0,20,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="在工作空间 App 中启用" VerticalAlignment="Center" />
+                                            <CheckBox x:Name="ChromeToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                        </Grid>
+                                        <Button x:Name="ChromeSettingsButton" Style="{StaticResource SecondaryButton}" Height="40" Margin="0,18,0,0"
+                                                Content="打开工作空间 Chrome 设置 / 安装页" Click="OpenChromeSettingsButton_Click" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                                    <StackPanel>
+                                        <TextBlock Text="电脑操作" Style="{StaticResource SectionTitle}" />
+                                        <TextBlock x:Name="ComputerInstallText" Text="检测插件状态" Style="{StaticResource HintText}" Margin="0,10,0,0" />
+                                        <Grid Margin="0,20,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="在工作空间 App 中启用" VerticalAlignment="Center" />
+                                            <CheckBox x:Name="ComputerUseToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                        </Grid>
+                                        <Button x:Name="ComputerSettingsButton" Style="{StaticResource SecondaryButton}" Height="40" Margin="0,18,0,0"
+                                                Content="打开工作空间 Computer Use 插件页" Click="OpenComputerSettingsButton_Click" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <Border Style="{StaticResource PanelCard}" Margin="0,16,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="320"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Windows 始终允许的应用" Style="{StaticResource SectionTitle}" />
+                                        <TextBlock Text="每行一个应用标识，例如 mspaint.exe。未列出的应用仍由工作空间 App 在使用时询问。"
+                                                   Style="{StaticResource HintText}" Margin="0,10,0,0" />
+                                    </StackPanel>
+                                    <TextBox x:Name="AllowedAppsBox" Grid.Column="2" Style="{StaticResource InputTextBox}"
+                                             Height="88" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" />
+                                </Grid>
+                            </Border>
+                            <Button x:Name="SaveCapabilitiesButton" Style="{StaticResource PrimaryButton}" Height="44" HorizontalAlignment="Right"
+                                    Width="260" Margin="0,16,0,0" Content="保存插件开关与应用白名单" Click="SaveCapabilitiesButton_Click" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="MCP">
+                    <Grid Margin="4,15,4,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="360" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <ListBox x:Name="McpList" Style="{StaticResource ConfigListBox}" SelectionChanged="McpList_SelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Transport}" Foreground="#727D93" FontSize="10" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="#AFA5F0"
+                                                       FontSize="10.5" VerticalAlignment="Center" TextAlignment="Right" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <Grid Grid.Row="1" Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Button Style="{StaticResource SecondaryButton}" Height="38" Content="新建" Click="NewMcpButton_Click" />
+                                <Button Grid.Column="2" x:Name="ImportMcpButton" Style="{StaticResource SecondaryButton}" Height="38"
+                                        Content="从个人迁移" IsEnabled="False" Click="ImportMcpButton_Click" />
+                            </Grid>
+                        </Grid>
+                        <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="MCP 配置" Style="{StaticResource SectionTitle}" />
+                                <Grid Grid.Row="1" Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="160"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="名称" Style="{StaticResource HintText}" />
+                                        <TextBox x:Name="McpNameBox" Style="{StaticResource InputTextBox}" Margin="0,6,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="类型" Style="{StaticResource HintText}" />
+                                        <ComboBox x:Name="McpTypeBox" Style="{StaticResource InputComboBox}" Margin="0,6,0,0" SelectionChanged="McpTypeBox_SelectionChanged">
+                                            <ComboBoxItem Content="STDIO" />
+                                            <ComboBoxItem Content="HTTP" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Grid.Row="2" Margin="0,14,0,0">
+                                    <TextBlock x:Name="McpAddressLabel" Text="命令" Style="{StaticResource HintText}" />
+                                    <TextBox x:Name="McpAddressBox" Style="{StaticResource InputTextBox}" Margin="0,6,0,0" />
+                                </StackPanel>
+                                <Grid Grid.Row="3" Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="启用服务器" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="McpEnabledToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                </Grid>
+                                <StackPanel Grid.Row="4" Margin="0,14,0,0">
+                                    <TextBlock Text="参数（每行一个，仅 STDIO）" Style="{StaticResource HintText}" />
+                                    <TextBox x:Name="McpArgsBox" Style="{StaticResource InputTextBox}" Margin="0,6,0,0"
+                                             AcceptsReturn="True" VerticalScrollBarVisibility="Auto" MinHeight="90" />
+                                </StackPanel>
+                                <Grid Grid.Row="5" Margin="0,18,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="130"/></Grid.ColumnDefinitions>
+                                    <Button x:Name="RemoveMcpButton" Style="{StaticResource SecondaryButton}" Height="40"
+                                            Content="删除工作空间配置" IsEnabled="False" Click="RemoveMcpButton_Click" />
+                                    <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Height="40"
+                                            Content="保存 MCP" Click="SaveMcpButton_Click" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="权限">
+                    <Grid Margin="4,15,4,4">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="360"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource PanelCard}">
+                            <StackPanel>
+                                <TextBlock Text="快速预设" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="预设只修改工作空间 App。个人权限不读取到编辑器，也不会被改动。"
+                                           Style="{StaticResource HintText}" Margin="0,10,0,0" />
+                                <ComboBox x:Name="PermissionPresetBox" Style="{StaticResource InputComboBox}" Margin="0,22,0,0"
+                                          SelectionChanged="PermissionPresetBox_SelectionChanged">
+                                    <ComboBoxItem Content="日常开发（推荐）" Tag="balanced" />
+                                    <ComboBoxItem Content="只读审查" Tag="readonly" />
+                                    <ComboBoxItem Content="Full Access" Tag="full" />
+                                    <ComboBoxItem Content="自定义" Tag="custom" />
+                                </ComboBox>
+                                <Border x:Name="PermissionRiskBox" Margin="0,20,0,0" Padding="13,10" CornerRadius="11"
+                                        Background="#181D29" BorderBrush="#30384B" BorderThickness="1">
+                                    <TextBlock x:Name="PermissionRiskText" Text="选择预设后会显示风险说明。"
+                                               Style="{StaticResource HintText}" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <TextBlock Text="详细权限" Style="{StaticResource SectionTitle}" />
+                                <Grid Grid.Row="1" Margin="0,18,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="审批策略" Style="{StaticResource HintText}" />
+                                        <ComboBox x:Name="ApprovalPolicyBox" Style="{StaticResource InputComboBox}" Margin="0,6,0,0">
+                                            <ComboBoxItem Content="untrusted"/><ComboBoxItem Content="on-request"/><ComboBoxItem Content="never"/>
+                                        </ComboBox>
+                                        <TextBlock Text="Windows Sandbox" Style="{StaticResource HintText}" Margin="0,18,0,0" />
+                                        <ComboBox x:Name="WindowsSandboxBox" Style="{StaticResource InputComboBox}" Margin="0,6,0,0">
+                                            <ComboBoxItem Content="unelevated"/><ComboBoxItem Content="elevated"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="沙箱模式" Style="{StaticResource HintText}" />
+                                        <ComboBox x:Name="SandboxModeBox" Style="{StaticResource InputComboBox}" Margin="0,6,0,0">
+                                            <ComboBoxItem Content="read-only"/><ComboBoxItem Content="workspace-write"/><ComboBoxItem Content="danger-full-access"/>
+                                        </ComboBox>
+                                        <Grid Margin="0,21,0,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="网络访问" />
+                                                <TextBlock Text="工作空间 App 工具进程的网络开关" Style="{StaticResource HintText}" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <CheckBox x:Name="NetworkToggle" Grid.Column="1" Style="{StaticResource SwitchStyle}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                                <Button Grid.Row="2" Style="{StaticResource PrimaryButton}" Height="42" Width="220"
+                                        HorizontalAlignment="Right" Content="保存权限配置" Click="SavePermissionsButton_Click" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="快照与恢复">
+                    <Grid Margin="4,15,4,4">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
+                        <ListBox x:Name="SnapshotList" Style="{StaticResource ConfigListBox}" SelectionChanged="SnapshotList_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="130"/></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding ArchivePath}" Foreground="#68738A" FontSize="9.5" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding FileCount, StringFormat={}{0} files}" Foreground="#909AAF"
+                                                   VerticalAlignment="Center" TextAlignment="Right" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                            <StackPanel>
+                                <TextBlock Text="安全恢复" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="快照会标明个人或工作空间目标。工作空间快照含 config.toml、全局规则、用户 Skills 与 Memories；个人目标含全局规则、用户 Skills 与 Memories。始终排除 auth.json。"
+                                           Style="{StaticResource HintText}" Margin="0,12,0,0" />
+                                <Button Style="{StaticResource PrimaryButton}" Height="42" Margin="0,22,0,0"
+                                        Content="立即创建快照" Click="CreateSnapshotButton_Click" />
+                                <Button x:Name="RestoreSnapshotButton" Style="{StaticResource SecondaryButton}" Height="42" Margin="0,10,0,0"
+                                        Content="恢复所选快照" IsEnabled="False" Click="RestoreSnapshotButton_Click" />
+                                <Button Style="{StaticResource SecondaryButton}" Height="42" Margin="0,10,0,0"
+                                        Content="打开快照目录" Click="OpenSnapshotFolderButton_Click" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+
+            <Border Grid.Row="3" BorderBrush="#232A3B" BorderThickness="0,1,0,0" Background="#760B0E16">
+                <Grid Margin="24,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="10"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse x:Name="FooterStateDot" Width="7" Height="7" Fill="#68DEB1" />
+                        <TextBlock x:Name="FooterStatusText" Text="准备就绪" Margin="9,0,0,0" Foreground="#A7B0C1" FontSize="11" />
+                    </StackPanel>
+                    <Button Grid.Column="1" x:Name="RefreshButton" Style="{StaticResource SecondaryButton}" Height="36"
+                            Content="刷新对比" Click="RefreshButton_Click" />
+                    <Button Grid.Column="3" Style="{StaticResource SecondaryButton}" Height="36"
+                            Content="关闭" Click="CloseButton_Click" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title description">
+  <title id="title">Codex 多开器界面预览</title>
+  <desc id="description">个人空间与隔离工作空间并列显示的深色启动器界面</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16142d"/>
+      <stop offset="0.48" stop-color="#0b1019"/>
+      <stop offset="1" stop-color="#172634"/>
+    </linearGradient>
+    <linearGradient id="personal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#99ead0"/>
+      <stop offset="1" stop-color="#60bcd4"/>
+    </linearGradient>
+    <linearGradient id="work" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d4cbff"/>
+      <stop offset="1" stop-color="#9782fb"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="700" fill="#f3f4f6"/>
+  <rect x="28" y="24" width="1144" height="652" rx="20" fill="url(#bg)" stroke="#394257" filter="url(#shadow)"/>
+  <path d="M28 82h1144" stroke="#273044"/>
+  <rect x="52" y="40" width="28" height="28" rx="9" fill="#9b88f4"/>
+  <text x="66" y="60" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="15" fill="#11131b">✦</text>
+  <text x="94" y="59" font-family="Segoe UI, sans-serif" font-size="12" font-weight="700" fill="#d3d8e4">CODEX 多开器</text>
+  <text x="1124" y="59" font-family="Segoe UI, sans-serif" font-size="18" fill="#aab2c3">—  ×</text>
+
+  <rect x="74" y="108" width="1052" height="54" rx="15" fill="#121722" stroke="#30384b"/>
+  <circle cx="102" cy="135" r="14" fill="#1b302d"/>
+  <path d="M96 135l4 4 8-9" fill="none" stroke="#68deb1" stroke-width="2" stroke-linecap="round"/>
+  <text x="126" y="140" font-family="Segoe UI, sans-serif" font-size="13" fill="#73e1b7">双目录隔离已就绪</text>
+  <text x="1016" y="140" font-family="Consolas, monospace" font-size="11" fill="#aeb6c8">APP  current · x64</text>
+
+  <rect x="74" y="184" width="510" height="386" rx="24" fill="#151a26" fill-opacity="0.92" stroke="#2a3544"/>
+  <rect x="606" y="184" width="520" height="386" rx="24" fill="#151725" fill-opacity="0.92" stroke="#51457d"/>
+  <circle cx="118" cy="229" r="24" fill="#17312f" stroke="#295149"/>
+  <circle cx="118" cy="222" r="6" fill="#9ce8d0"/>
+  <path d="M108 239c0-8 20-8 20 0" fill="none" stroke="#9ce8d0" stroke-width="2"/>
+  <text x="158" y="217" font-family="Segoe UI, sans-serif" font-size="10" font-weight="700" fill="#78d8bd">PERSONAL</text>
+  <text x="158" y="244" font-family="Segoe UI, sans-serif" font-size="23" font-weight="600" fill="#f5f7fc">个人空间</text>
+  <rect x="472" y="204" width="88" height="27" rx="13" fill="#14251f" stroke="#285443"/>
+  <circle cx="488" cy="217" r="3" fill="#68deb1"/>
+  <text x="499" y="221" font-family="Segoe UI, sans-serif" font-size="11" fill="#cff8e8">运行中 · 1</text>
+
+  <rect x="650" y="205" width="48" height="48" rx="15" fill="#292344" stroke="#51457d"/>
+  <rect x="663" y="224" width="22" height="18" rx="3" fill="#bfb4ff"/>
+  <rect x="667" y="216" width="14" height="6" rx="2" fill="#bfb4ff"/>
+  <text x="714" y="217" font-family="Segoe UI, sans-serif" font-size="10" font-weight="700" fill="#9b8fe6">ISOLATED PROFILE</text>
+  <text x="714" y="244" font-family="Segoe UI, sans-serif" font-size="23" font-weight="600" fill="#f5f7fc">工作空间</text>
+  <rect x="1028" y="204" width="74" height="27" rx="13" fill="#121722" stroke="#2a3244"/>
+  <text x="1045" y="221" font-family="Segoe UI, sans-serif" font-size="11" fill="#aab2c3">未运行</text>
+
+  <text x="102" y="290" font-family="Segoe UI, sans-serif" font-size="12" fill="#929cb1">保留个人登录、插件、任务历史与默认电脑能力。</text>
+  <text x="634" y="290" font-family="Segoe UI, sans-serif" font-size="12" fill="#929cb1">独立持有配置、认证、任务与记忆；个人空间默认保持原样。</text>
+  <text x="102" y="333" font-family="Segoe UI, sans-serif" font-size="10" font-weight="700" fill="#68738b">AUTHENTICATION</text>
+  <text x="102" y="354" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#d8ddea">ChatGPT Account</text>
+  <text x="634" y="333" font-family="Segoe UI, sans-serif" font-size="10" font-weight="700" fill="#68738b">PROVIDER / MODEL</text>
+  <text x="634" y="354" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#d8ddea">custom · example-model</text>
+  <text x="894" y="333" font-family="Segoe UI, sans-serif" font-size="10" font-weight="700" fill="#68738b">ENDPOINT</text>
+  <text x="894" y="354" font-family="Segoe UI, sans-serif" font-size="12" font-weight="600" fill="#d8ddea">api.example.invalid/v1</text>
+
+  <rect x="101" y="497" width="456" height="50" rx="14" fill="url(#personal)"/>
+  <text x="329" y="528" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#0c0d13">启动个人 Codex ↗</text>
+  <rect x="633" y="497" width="412" height="50" rx="14" fill="url(#work)"/>
+  <text x="839" y="528" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" font-weight="700" fill="#11101a">启动工作空间 Codex ↗</text>
+  <rect x="1056" y="497" width="46" height="50" rx="13" fill="#151a26" stroke="#30384b"/>
+  <text x="1079" y="528" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="18" fill="#d8ddea">⋯</text>
+
+  <rect x="74" y="592" width="1052" height="58" rx="17" fill="#10141e" stroke="#282f40"/>
+  <rect x="95" y="608" width="50" height="28" rx="14" fill="#202738" stroke="#343d52"/>
+  <circle cx="109" cy="622" r="10" fill="#8690a5"/>
+  <text x="160" y="619" font-family="Segoe UI, sans-serif" font-size="12" fill="#d3d8e4">允许并行启动</text>
+  <text x="160" y="636" font-family="Segoe UI, sans-serif" font-size="10" fill="#707b91">默认关闭 · 两个实例不会被自动关闭或互相复用</text>
+</svg>

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CodexChannelLauncher.csproj" />
+  <Project Path="tests/CodexChannelLauncher.Tests/CodexChannelLauncher.Tests.csproj" />
+</Solution>

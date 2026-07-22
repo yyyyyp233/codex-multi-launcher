@@ -2,16 +2,16 @@
 
 ## Goal
 
-Codex 多开器在同一 Windows 用户会话中提供两个明确入口：个人实例继续使用默认 Codex Home；工作空间实例使用独立 Codex Home、Electron 用户数据和本地 App 运行副本。
+Codex 多开器在同一 Windows 用户会话中保留一个个人主入口，并允许任意数量的隔离 Profile。个人实例继续使用默认 Codex Home；每个隔离实例都使用自己的 Codex Home、Electron 用户数据、本地 App 运行变体和颜色角标。
 
 ```text
 Codex 多开器
 ├─ 个人入口 → Windows Store 注册入口 → %USERPROFILE%\.codex
-└─ 工作空间入口
-   ├─ 注册：state\work-profile.json
-   ├─ Codex Home：profiles\<id>\codex-home
-   ├─ Electron 数据：profiles\<id>\electron
-   └─ App 运行副本：runtime-cache\<package-version>
+└─ 隔离 Profile 入口（0..N）
+   ├─ 注册表：state\profiles.json
+   ├─ Codex Home：profiles\<directory-id>\codex-home
+   ├─ Electron 数据：profiles\<directory-id>\electron
+   └─ App 运行变体：runtime-cache\<package-version>-<profile-id>-<color>
 ```
 
 所有启动器数据默认位于 `%LOCALAPPDATA%\CodexChannelLauncher`。`<id>` 是受限的本机目录标识，界面显示名独立保存，可由用户修改。
@@ -20,13 +20,15 @@ Codex 多开器
 
 运行状态分为：
 
-- `NotConfigured`：没有注册；若发现多个旧 marker，会要求用户选择；
-- `Configured`：注册、marker、`config.toml` 和 `auth.json` 均有效；
+- `NotConfigured`：没有注册；
+- `Configured`：注册、marker、`config.toml` 以及所选认证方式所需的认证状态有效；ChatGPT 账号模式允许在首次启动后登录；
 - `Invalid`：注册或配置存在但无法安全解析。
 
-注册文件缺失且只发现一个有效旧 marker 时，启动器只写入注册文件并继续使用原目录。它不会移动 profile，也不会重写配置或认证。
+新版注册表缺失时，启动器会将发现的全部有效旧 marker 一次性登记到 `profiles.json`，并消费旧单例注册文件。它不会移动 profile，也不会重写配置或认证；之后运行只读取新注册表。
 
-新建工作空间先在运行根目录下的 staging 目录完成配置、认证和 marker，再以目录移动提交；单个配置文件采用同目录临时文件、刷新磁盘并原子替换。API Key 不进入错误信息、日志、注册或 marker。
+新建隔离空间先在运行根目录下的 staging 目录完成配置、认证和 marker，再以目录移动提交。注册表、配置与 API Key 文件采用临时文件、刷新磁盘并原子替换。API Key 不进入错误信息、日志、注册、marker 或快照。
+
+认证模式由注册表明确记录：`ChatGptAccount`、`OpenAiApiKey`、`CustomResponses`。切换认证模式时会先校验新模式所需字段；切换到账号模式只在用户明确保存后移除旧 API Key 文件。
 
 ## Import allowlist
 

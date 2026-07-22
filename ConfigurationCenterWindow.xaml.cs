@@ -12,6 +12,7 @@ public partial class ConfigurationCenterWindow : Window
 {
     private readonly ProfileCoordinator coordinator;
     private readonly ConfigurationCenterService service;
+    private readonly string profileId;
     private readonly string? previewOutput;
     private bool isBusy;
     private bool isRendering;
@@ -25,6 +26,11 @@ public partial class ConfigurationCenterWindow : Window
     {
         this.coordinator = coordinator;
         service = coordinator.ConfigurationCenter;
+        profileId = coordinator.GetProfiles().FirstOrDefault(profile =>
+            profile.ProfileDirectoryName.Equals(
+                coordinator.Paths.WorkProfileDirectoryName,
+                StringComparison.OrdinalIgnoreCase))?.ProfileId
+            ?? throw new InvalidOperationException("当前隔离空间未注册，无法打开配置中心。");
         this.previewOutput = string.IsNullOrWhiteSpace(previewOutput) ? null : previewOutput;
         InitializeComponent();
         ProfilePathText.Text = coordinator.Paths.CompanyCodexHome;
@@ -63,7 +69,7 @@ public partial class ConfigurationCenterWindow : Window
             return;
         }
 
-        var window = new WorkProfileSetupWindow(coordinator)
+        var window = new WorkProfileSetupWindow(coordinator, profileId)
         {
             Owner = this
         };

@@ -19,25 +19,34 @@ public enum ProfileSetupMode
 {
     Create,
     Import,
-    RegisterExisting,
     Update
 }
 
-public sealed record WorkProfileRegistration(
-    int SchemaVersion,
-    string ProfileDirectoryName,
-    string DisplayName,
-    DateTime RegisteredAtUtc);
+[JsonConverter(typeof(JsonStringEnumConverter<ProfileAuthMode>))]
+public enum ProfileAuthMode
+{
+    CustomResponses,
+    OpenAiApiKey,
+    ChatGptAccount
+}
 
-public sealed record WorkProfileCandidate(
+public sealed record ManagedProfileRegistration(
+    int SchemaVersion,
+    string ProfileId,
     string ProfileDirectoryName,
     string DisplayName,
-    string CodexHome);
+    ProfileAuthMode AuthMode,
+    string AccentColor,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc);
+
+public sealed record ManagedProfileRegistry(
+    int SchemaVersion,
+    IReadOnlyList<ManagedProfileRegistration> Profiles);
 
 public sealed record ProfileSetupStatus(
     WorkProfileSetupState State,
-    WorkProfileRegistration? Registration,
-    IReadOnlyList<WorkProfileCandidate> Candidates,
+    ManagedProfileRegistration? Registration,
     string? Problem);
 
 public sealed record ProfileSetupRequest(
@@ -50,7 +59,8 @@ public sealed record ProfileSetupRequest(
     string ReasoningEffort = "high",
     string ApiKey = "",
     string? ImportSourceHome = null,
-    string? ExistingProfileDirectoryName = null);
+    string? ProfileId = null,
+    ProfileAuthMode AuthMode = ProfileAuthMode.CustomResponses);
 
 public sealed record CodexPackageInfo(
     string ExecutablePath,
@@ -72,12 +82,15 @@ public sealed record ChatGptProcessSnapshot(
 
 public sealed class LauncherState
 {
-    public ProcessMarker? CompanyRootProcess { get; set; }
+    public Dictionary<string, ProcessMarker> ProfileRootProcesses { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public DateTime? LastLaunchAtUtc { get; set; }
 
     [JsonConverter(typeof(JsonStringEnumConverter<ChannelKind>))]
     public ChannelKind? LastLaunchChannel { get; set; }
+
+    public string? LastLaunchProfileId { get; set; }
 
     public string? LastPackageVersion { get; set; }
 }
@@ -90,16 +103,23 @@ public sealed record CompanyProfileMetadata(
     string ReasoningEffort,
     string BaseUrl,
     DateTime ConfigUpdatedAt,
-    bool AuthConfigured);
+    bool AuthConfigured,
+    string ProfileId = "",
+    ProfileAuthMode AuthMode = ProfileAuthMode.CustomResponses,
+    string AccentColor = "#7C3AED");
+
+public sealed record ManagedProfileRuntimeStatus(
+    ManagedProfileRegistration Registration,
+    bool Running,
+    int RootProcessId,
+    CompanyProfileMetadata? Metadata,
+    string? Problem);
 
 public sealed record RuntimeStatus(
     bool PersonalRunning,
-    bool CompanyRunning,
     int PersonalRootProcessCount,
-    int CompanyRootProcessId,
     CodexPackageInfo? Package,
-    CompanyProfileMetadata? CompanyProfile,
-    ProfileSetupStatus ProfileSetup,
+    IReadOnlyList<ManagedProfileRuntimeStatus> ManagedProfiles,
     string? Problem);
 
 public sealed record LaunchOutcome(
@@ -108,7 +128,8 @@ public sealed record LaunchOutcome(
     bool BlockedByOtherChannel,
     ChannelKind Channel,
     string Message,
-    int ProcessId);
+    int ProcessId,
+    string? ProfileId = null);
 
 public sealed record LaunchProgress(string Phase, int Percent, string Message);
 
@@ -122,7 +143,9 @@ public sealed record RuntimeCacheManifest(
     DateTime CreatedAtUtc,
     int CompanyTrayBrandingVersion = 0,
     bool CompanyTrayBrandingApplied = false,
-    Dictionary<string, string>? CompanyTrayIconSha256 = null);
+    Dictionary<string, string>? CompanyTrayIconSha256 = null,
+    string? ProfileId = null,
+    string? BadgeColor = null);
 
 public sealed record TrayBrandingResult(
     bool Applied,

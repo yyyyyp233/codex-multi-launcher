@@ -29,6 +29,30 @@ public sealed class StateStore(LauncherPaths paths)
         }
     }
 
+    public ProcessMarker? TryLoadLegacyCompanyRootProcess()
+    {
+        try
+        {
+            if (!File.Exists(paths.StateFile))
+            {
+                return null;
+            }
+
+            using var document = JsonDocument.Parse(File.ReadAllText(paths.StateFile));
+            if (!document.RootElement.TryGetProperty("CompanyRootProcess", out var property) ||
+                property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                return null;
+            }
+
+            return property.Deserialize<ProcessMarker>(JsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public void Save(LauncherState state)
     {
         Directory.CreateDirectory(paths.StateDirectory);

@@ -9,6 +9,8 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
 
     public string Prepare(
         CodexPackageInfo package,
+        string profileId,
+        string badgeColor,
         Action<LaunchProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -23,7 +25,8 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
 
         var sourceHash = ComputeSha256(sourceEntryExecutable);
         var packageFingerprint = ComputeSha256(package.ExecutablePath);
-        var cacheKey = $"{Sanitize(package.PackageVersion)}-{packageFingerprint[..12].ToLowerInvariant()}";
+        var cacheKey = $"{Sanitize(package.PackageVersion)}-{packageFingerprint[..12].ToLowerInvariant()}-" +
+                       $"{Sanitize(profileId)}-{Sanitize(badgeColor.TrimStart('#').ToLowerInvariant())}";
         var versionsRoot = Path.Combine(paths.RuntimeCacheRoot, "versions");
         var finalRoot = Path.Combine(versionsRoot, cacheKey);
         var finalApp = Path.Combine(finalRoot, "app");
@@ -48,15 +51,15 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
                 throw new TimeoutException("等待 Codex 本机运行副本准备完成超时。");
             }
 
-            if (Validate(finalRoot, sourceApp, package, sourceHash))
+            if (Validate(finalRoot, sourceApp, package, sourceHash, profileId, badgeColor))
             {
                 progress?.Invoke(new LaunchProgress("runtime-cache", 100, "已验证本机运行副本"));
                 return finalExecutable;
             }
 
             if (Directory.Exists(finalRoot) &&
-                TryAdoptCompleteClone(finalRoot, sourceApp, package, sourceHash) &&
-                Validate(finalRoot, sourceApp, package, sourceHash))
+                TryAdoptCompleteClone(finalRoot, sourceApp, package, sourceHash, profileId, badgeColor) &&
+                Validate(finalRoot, sourceApp, package, sourceHash, profileId, badgeColor))
             {
                 progress?.Invoke(new LaunchProgress("runtime-cache", 100, "已升级并验证本机运行副本"));
                 return finalExecutable;
@@ -128,7 +131,7 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
                     throw new IOException("运行副本文件数量或总大小校验失败。");
                 }
 
-                var branding = CompanyTrayIconBranding.Apply(sourceApp, stagingApp, log);
+                var branding = CompanyTrayIconBranding.Apply(sourceApp, stagingApp, badgeColor, log);
 
                 var manifest = new RuntimeCacheManifest(
                     package.PackageVersion,
@@ -140,12 +143,14 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
                     DateTime.UtcNow,
                     branding.Version,
                     branding.Applied,
-                    branding.FileSha256);
+                    branding.FileSha256,
+                    profileId,
+                    badgeColor.ToUpperInvariant());
                 File.WriteAllText(
                     Path.Combine(stagingRoot, "cache-manifest.json"),
                     JsonSerializer.Serialize(manifest, JsonOptions));
 
-                if (!Validate(stagingRoot, sourceApp, package, sourceHash))
+                if (!Validate(stagingRoot, sourceApp, package, sourceHash, profileId, badgeColor))
                 {
                     throw new IOException("运行副本的工作空间托盘标识或缓存清单校验失败。");
                 }
@@ -187,7 +192,9 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
         string cacheRoot,
         string sourceApp,
         CodexPackageInfo package,
-        string sourceHash)
+        string sourceHash,
+        string profileId,
+        string badgeColor)
     {
         try
         {
@@ -206,6 +213,8 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
                 !string.Equals(manifest.PackageVersion, package.PackageVersion, StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(manifest.EntryExecutableName, "ChatGPT.exe", StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(manifest.EntryExecutableSha256, sourceHash, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(manifest.ProfileId, profileId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(manifest.BadgeColor, badgeColor, StringComparison.OrdinalIgnoreCase) ||
                 !ComputeSha256(executablePath).Equals(sourceHash, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
@@ -232,7 +241,9 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
         string cacheRoot,
         string sourceApp,
         CodexPackageInfo package,
-        string sourceEntryHash)
+        string sourceEntryHash,
+        string profileId,
+        string badgeColor)
     {
         try
         {
@@ -254,7 +265,7 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
                 return false;
             }
 
-            var branding = CompanyTrayIconBranding.Apply(sourceApp, cachedApp);
+            var branding = CompanyTrayIconBranding.Apply(sourceApp, cachedApp, badgeColor);
 
             var manifest = new RuntimeCacheManifest(
                 package.PackageVersion,
@@ -266,7 +277,9 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
                 DateTime.UtcNow,
                 branding.Version,
                 branding.Applied,
-                branding.FileSha256);
+                branding.FileSha256,
+                profileId,
+                badgeColor.ToUpperInvariant());
             File.WriteAllText(
                 Path.Combine(cacheRoot, "cache-manifest.json"),
                 JsonSerializer.Serialize(manifest, JsonOptions));

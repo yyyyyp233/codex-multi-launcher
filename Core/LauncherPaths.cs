@@ -13,19 +13,22 @@ public sealed class LauncherPaths
     public const string DefaultWorkProfileDirectoryName = "work";
 
     private string workProfileDirectoryName = DefaultWorkProfileDirectoryName;
+    private readonly string userProfile;
+    private readonly string localAppData;
+    private readonly string roamingAppData;
 
     public LauncherPaths(LauncherPathOverrides? overrides = null)
     {
         overrides ??= new LauncherPathOverrides();
-        var userProfile = ResolveRoot(
+        userProfile = ResolveRoot(
             overrides.UserProfile,
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             nameof(overrides.UserProfile));
-        var localAppData = ResolveRoot(
+        localAppData = ResolveRoot(
             overrides.LocalAppData,
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             nameof(overrides.LocalAppData));
-        var roamingAppData = ResolveRoot(
+        roamingAppData = ResolveRoot(
             overrides.RoamingAppData,
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             nameof(overrides.RoamingAppData));
@@ -42,6 +45,7 @@ public sealed class LauncherPaths
         StateDirectory = Path.Combine(RuntimeRoot, "state");
         StateFile = Path.Combine(StateDirectory, "launcher-state.json");
         WorkProfileRegistrationFile = Path.Combine(StateDirectory, "work-profile.json");
+        ProfilesRegistryFile = Path.Combine(StateDirectory, "profiles.json");
         LogDirectory = Path.Combine(RuntimeRoot, "logs");
         LogFile = Path.Combine(LogDirectory, "launcher.log");
         RuntimeCacheRoot = Path.Combine(RuntimeRoot, "runtime-cache");
@@ -62,6 +66,8 @@ public sealed class LauncherPaths
     public string StateFile { get; }
 
     public string WorkProfileRegistrationFile { get; }
+
+    public string ProfilesRegistryFile { get; }
 
     public string LogDirectory { get; }
 
@@ -98,6 +104,19 @@ public sealed class LauncherPaths
     public string PersonalMemories => Path.Combine(PersonalCodexHome, "memories");
 
     public string CompanyMemories => Path.Combine(CompanyCodexHome, "memories");
+
+    public LauncherPaths CreateProfileScope(string directoryName)
+    {
+        var scoped = new LauncherPaths(new LauncherPathOverrides(
+            userProfile,
+            localAppData,
+            roamingAppData,
+            PersonalCodexHome,
+            PersonalElectronData,
+            RuntimeRoot));
+        scoped.SelectWorkProfileDirectory(directoryName);
+        return scoped;
+    }
 
     public void SelectWorkProfileDirectory(string directoryName)
     {

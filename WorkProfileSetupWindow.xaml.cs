@@ -9,15 +9,19 @@ namespace CodexChannelLauncher;
 public partial class WorkProfileSetupWindow : Window
 {
     private readonly ProfileCoordinator coordinator;
+    private readonly string? profileId;
     private readonly ProfileSetupStatus initialStatus;
     private readonly bool editingExisting;
     private bool isBusy;
 
-    public WorkProfileSetupWindow(ProfileCoordinator coordinator)
+    public WorkProfileSetupWindow(ProfileCoordinator coordinator, string? profileId = null)
     {
         this.coordinator = coordinator;
-        initialStatus = coordinator.GetProfileSetupStatus();
-        editingExisting = initialStatus.State == WorkProfileSetupState.Configured;
+        this.profileId = profileId;
+        initialStatus = string.IsNullOrWhiteSpace(profileId)
+            ? new ProfileSetupStatus(WorkProfileSetupState.NotConfigured, null, null)
+            : coordinator.GetProfileSetupStatus(profileId);
+        editingExisting = !string.IsNullOrWhiteSpace(profileId) && initialStatus.Registration is not null;
 
         InitializeComponent();
         PopulateInitialState();
@@ -33,34 +37,47 @@ public partial class WorkProfileSetupWindow : Window
             ProblemPanel.Visibility = Visibility.Visible;
         }
 
-        ExistingCandidateBox.ItemsSource = initialStatus.Candidates;
-        ExistingCandidatePanel.Visibility = !editingExisting && initialStatus.Candidates.Count > 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        if (initialStatus.Candidates.Count > 0)
-        {
-            ExistingCandidateBox.SelectedIndex = 0;
-        }
-
+        ModeBox.SelectedIndex = 0;
+        AuthModeBox.SelectedIndex = 0;
         if (!editingExisting)
         {
+            HeadingText.Text = "创建隔离空间";
+            SummaryText.Text = "每个空间拥有独立的账号、配置、任务、插件与角标颜色。";
             UpdateModePanels();
             return;
         }
 
-        var metadata = coordinator.GetStatus().CompanyProfile
-                       ?? throw new InvalidDataException("工作空间元数据不可用。");
-        HeadingText.Text = "编辑工作空间";
-        SummaryText.Text = "修改仅作用于隔离工作空间；API Key 留空时保持原值。";
+        CompanyProfileMetadata? metadata = null;
+        try
+        {
+            metadata = coordinator.GetProfileMetadataForEditing(profileId!);
+        }
+        catch (Exception exception)
+        {
+            ProblemText.Text = initialStatus.Problem ?? exception.Message;
+            ProblemPanel.Visibility = Visibility.Visible;
+        }
+
+        var registration = initialStatus.Registration!;
+        HeadingText.Text = "编辑隔离空间";
+        SummaryText.Text = "修改只作用于当前隔离空间；API Key 留空时保留原值。";
         ModeBox.IsEnabled = false;
-        ModeBox.SelectedIndex = 0;
-        DisplayNameBox.Text = metadata.DisplayName;
-        ProviderIdBox.Text = metadata.Provider;
-        ProviderNameBox.Text = metadata.ProviderName;
-        BaseUrlBox.Text = metadata.BaseUrl;
-        ModelBox.Text = metadata.Model;
-        SelectReasoningEffort(metadata.ReasoningEffort);
-        ApiKeyHintText.Text = "留空保留当前 API Key；输入新值时仅原子替换隔离 auth.json。";
+        DisplayNameBox.Text = registration.DisplayName;
+        SetSelectedAuthMode(registration.AuthMode);
+        ProviderIdBox.Text = registration.AuthMode == ProfileAuthMode.CustomResponses && metadata is not null
+            ? metadata.Provider
+            : "custom";
+        ProviderNameBox.Text = registration.AuthMode == ProfileAuthMode.CustomResponses && metadata is not null
+            ? metadata.ProviderName
+            : "Custom Provider";
+        BaseUrlBox.Text = registration.AuthMode == ProfileAuthMode.CustomResponses && metadata is not null
+            ? metadata.BaseUrl
+            : "https://api.example.invalid/v1";
+        ModelBox.Text = registration.AuthMode == ProfileAuthMode.ChatGptAccount
+            ? string.Empty
+            : metadata?.Model ?? string.Empty;
+        SelectReasoningEffort(metadata?.ReasoningEffort ?? "high");
+        ApiKeyHintText.Text = "留空保留当前 API Key；切换认证方式时必须输入新 Key。";
         SaveButtonText.Text = "保存修改";
         UpdateModePanels();
     }
@@ -77,16 +94,40 @@ public partial class WorkProfileSetupWindow : Window
         }
     }
 
+    private void AuthModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CustomProviderPanel is not null)
+        {
+            UpdateModePanels();
+        }
+    }
+
     private void UpdateModePanels()
     {
         var import = !editingExisting && SelectedMode() == ProfileSetupMode.Import;
+        var authMode = SelectedAuthMode();
         ImportPanel.Visibility = import ? Visibility.Visible : Visibility.Collapsed;
-        ProviderPanel.Visibility = import ? Visibility.Collapsed : Visibility.Visible;
+        AuthenticationPanel.Visibility = import ? Visibility.Collapsed : Visibility.Visible;
+        CustomProviderPanel.Visibility = !import && authMode == ProfileAuthMode.CustomResponses
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ModelSettingsPanel.Visibility = !import && authMode != ProfileAuthMode.ChatGptAccount
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ApiKeyPanel.Visibility = !import && authMode != ProfileAuthMode.ChatGptAccount
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        ApiKeyHintText.Text = editingExisting
+            ? "留空保留当前 API Key；切换认证方式时必须输入新 Key。"
+            : authMode == ProfileAuthMode.OpenAiApiKey
+                ? "仅写入当前空间的 auth.json，不会回显或进入快照。"
+                : "第三方 Key 仅写入当前空间的 auth.json，不会进入日志或快照。";
         SaveButtonText.Text = editingExisting
             ? "保存修改"
             : import
-                ? "导入工作空间"
-                : "创建工作空间";
+                ? "导入隔离空间"
+                : "创建隔离空间";
     }
 
     private void BrowseImportButton_Click(object sender, RoutedEventArgs e)
@@ -102,21 +143,6 @@ public partial class WorkProfileSetupWindow : Window
         }
     }
 
-    private async void UseExistingButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (ExistingCandidateBox.SelectedItem is not WorkProfileCandidate candidate)
-        {
-            SetFooter("请选择一个有效的旧工作空间。", true);
-            return;
-        }
-
-        var request = new ProfileSetupRequest(
-            ProfileSetupMode.RegisterExisting,
-            DisplayNameBox.Text,
-            ExistingProfileDirectoryName: candidate.ProfileDirectoryName);
-        await SaveAsync(request);
-    }
-
     private async void SaveButton_Click(object sender, RoutedEventArgs e)
     {
         var mode = editingExisting ? ProfileSetupMode.Update : SelectedMode();
@@ -129,7 +155,9 @@ public partial class WorkProfileSetupWindow : Window
             ModelBox.Text,
             SelectedReasoningEffort(),
             ApiKeyBox.Password,
-            ImportPathBox.Text);
+            ImportPathBox.Text,
+            ProfileId: profileId,
+            AuthMode: SelectedAuthMode());
         await SaveAsync(request);
     }
 
@@ -142,7 +170,7 @@ public partial class WorkProfileSetupWindow : Window
 
         isBusy = true;
         SaveButton.IsEnabled = false;
-        FooterText.Text = "正在安全写入配置…";
+        FooterText.Text = "正在安全写入隔离配置…";
         try
         {
             await Task.Run(() => coordinator.ConfigureWorkProfile(request));
@@ -167,8 +195,29 @@ public partial class WorkProfileSetupWindow : Window
             ? ProfileSetupMode.Import
             : ProfileSetupMode.Create;
 
+    private ProfileAuthMode SelectedAuthMode() =>
+        Enum.TryParse<ProfileAuthMode>(
+            (AuthModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(),
+            out var mode)
+            ? mode
+            : ProfileAuthMode.ChatGptAccount;
+
     private string SelectedReasoningEffort() =>
         (ReasoningBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "high";
+
+    private void SetSelectedAuthMode(ProfileAuthMode value)
+    {
+        foreach (var item in AuthModeBox.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Tag?.ToString(), value.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                AuthModeBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        AuthModeBox.SelectedIndex = 0;
+    }
 
     private void SelectReasoningEffort(string value)
     {

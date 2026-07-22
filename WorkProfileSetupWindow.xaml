@@ -61,14 +61,22 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="12" />
         </Style>
+        <Style x:Key="SectionCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="13" />
+            <Setter Property="Background" Value="#121624" />
+            <Setter Property="BorderBrush" Value="#272F40" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="Margin" Value="0,0,0,15" />
+        </Style>
     </Window.Resources>
 
-    <Border CornerRadius="18" BorderBrush="#3A4257" BorderThickness="1" Background="#0B0E16">
+    <Border CornerRadius="18" BorderBrush="#2F3749" BorderThickness="1" Background="#0B0E16">
         <Grid ClipToBounds="True">
             <Grid.Background>
                 <RadialGradientBrush Center="0.78,0.15" GradientOrigin="0.78,0.15" RadiusX="0.9" RadiusY="0.9">
-                    <GradientStop Color="#39315F" Offset="0" />
-                    <GradientStop Color="#141728" Offset="0.38" />
+                    <GradientStop Color="#332C50" Offset="0" />
+                    <GradientStop Color="#121525" Offset="0.38" />
                     <GradientStop Color="#0B0E16" Offset="1" />
                 </RadialGradientBrush>
             </Grid.Background>
@@ -137,23 +145,16 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border x:Name="ExistingCandidatePanel" Visibility="Collapsed" Margin="0,0,0,15"
-                                Padding="14" CornerRadius="13" Background="#151526"
-                                BorderBrush="#4A4269" BorderThickness="1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="发现旧工作空间" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox x:Name="ExistingCandidateBox" Style="{StaticResource InputComboBox}"
-                                              DisplayMemberPath="DisplayName" />
-                                </StackPanel>
-                                <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Height="40"
-                                        VerticalAlignment="Bottom" Content="原地使用" Click="UseExistingButton_Click" />
-                            </Grid>
+                        <Border x:Name="AuthenticationPanel" Style="{StaticResource SectionCard}">
+                            <StackPanel>
+                                <TextBlock Text="认证方式" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="AuthModeBox" Style="{StaticResource InputComboBox}"
+                                          SelectionChanged="AuthModeBox_SelectionChanged">
+                                    <ComboBoxItem Content="ChatGPT 账号" Tag="ChatGptAccount" IsSelected="True" />
+                                    <ComboBoxItem Content="OpenAI API Key" Tag="OpenAiApiKey" />
+                                    <ComboBoxItem Content="自定义 Responses 服务" Tag="CustomResponses" />
+                                </ComboBox>
+                            </StackPanel>
                         </Border>
 
                         <Grid x:Name="ImportPanel" Visibility="Collapsed" Margin="0,0,0,15">
@@ -170,68 +171,66 @@
                                     VerticalAlignment="Bottom" Content="浏览…" Click="BrowseImportButton_Click" />
                         </Grid>
 
-                        <Grid x:Name="ProviderPanel">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="15" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="15" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="15" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="18" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
+                        <StackPanel x:Name="ProviderPanel">
+                            <Border x:Name="CustomProviderPanel" Style="{StaticResource SectionCard}">
                                 <StackPanel>
-                                    <TextBlock Text="Provider ID" Style="{StaticResource FieldLabel}" />
-                                    <TextBox x:Name="ProviderIdBox" Style="{StaticResource InputTextBox}" Text="custom" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Provider ID" Style="{StaticResource FieldLabel}" />
+                                            <TextBox x:Name="ProviderIdBox" Style="{StaticResource InputTextBox}" Text="custom" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Provider 名称" Style="{StaticResource FieldLabel}" />
+                                            <TextBox x:Name="ProviderNameBox" Style="{StaticResource InputTextBox}" Text="Custom Provider" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <StackPanel Margin="0,15,0,0">
+                                        <TextBlock Text="Base URL" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="BaseUrlBox" Style="{StaticResource InputTextBox}"
+                                                 ToolTip="必须使用 HTTPS；localhost 或回环地址可使用 HTTP。" />
+                                    </StackPanel>
                                 </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Provider 名称" Style="{StaticResource FieldLabel}" />
-                                    <TextBox x:Name="ProviderNameBox" Style="{StaticResource InputTextBox}" Text="Custom Provider" />
-                                </StackPanel>
-                            </Grid>
+                            </Border>
 
-                            <StackPanel Grid.Row="2">
-                                <TextBlock Text="Base URL" Style="{StaticResource FieldLabel}" />
-                                <TextBox x:Name="BaseUrlBox" Style="{StaticResource InputTextBox}"
-                                         ToolTip="必须使用 HTTPS；localhost 或回环地址可使用 HTTP。" />
-                            </StackPanel>
+                            <Border x:Name="ModelSettingsPanel" Style="{StaticResource SectionCard}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="18" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="模型" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="ModelBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="推理等级" Style="{StaticResource FieldLabel}" />
+                                        <ComboBox x:Name="ReasoningBox" Style="{StaticResource InputComboBox}" SelectedIndex="3">
+                                            <ComboBoxItem Content="minimal" />
+                                            <ComboBoxItem Content="low" />
+                                            <ComboBoxItem Content="medium" />
+                                            <ComboBoxItem Content="high" />
+                                            <ComboBoxItem Content="xhigh" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                            <Grid Grid.Row="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="18" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
+                            <Border x:Name="ApiKeyPanel" Style="{StaticResource SectionCard}">
                                 <StackPanel>
-                                    <TextBlock Text="模型" Style="{StaticResource FieldLabel}" />
-                                    <TextBox x:Name="ModelBox" Style="{StaticResource InputTextBox}" />
+                                    <TextBlock Text="API Key" Style="{StaticResource FieldLabel}" />
+                                    <PasswordBox x:Name="ApiKeyBox" Style="{StaticResource InputPasswordBox}" />
+                                    <TextBlock x:Name="ApiKeyHintText"
+                                               Text="仅原子写入隔离 auth.json，不回显、不写日志、不进入快照。"
+                                               Margin="0,6,0,0" Foreground="#737E94" FontSize="10.5" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="推理等级" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox x:Name="ReasoningBox" Style="{StaticResource InputComboBox}" SelectedIndex="3">
-                                        <ComboBoxItem Content="minimal" />
-                                        <ComboBoxItem Content="low" />
-                                        <ComboBoxItem Content="medium" />
-                                        <ComboBoxItem Content="high" />
-                                        <ComboBoxItem Content="xhigh" />
-                                    </ComboBox>
-                                </StackPanel>
-                            </Grid>
-
-                            <StackPanel Grid.Row="6">
-                                <TextBlock Text="API Key" Style="{StaticResource FieldLabel}" />
-                                <PasswordBox x:Name="ApiKeyBox" Style="{StaticResource InputPasswordBox}" />
-                                <TextBlock x:Name="ApiKeyHintText"
-                                           Text="仅原子写入隔离 auth.json，不回显、不写日志、不进入快照。"
-                                           Margin="0,6,0,0" Foreground="#737E94" FontSize="10.5" />
-                            </StackPanel>
-                        </Grid>
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
 

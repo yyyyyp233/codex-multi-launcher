@@ -359,6 +359,10 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
         string destinationRoot,
         ProfileSnapshotManifest manifest)
     {
+        var destinationRootFullPath = Path.GetFullPath(destinationRoot);
+        var destinationRootPrefix =
+            destinationRootFullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
         var expectedFiles = manifest.Files.ToDictionary(
             record => NormalizeArchivePath(record.Path),
             StringComparer.OrdinalIgnoreCase);
@@ -378,9 +382,9 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
                 throw new InvalidDataException("快照包含未登记或重复的文件，已拒绝恢复。");
             }
 
-            var destination = Path.GetFullPath(Path.Combine(destinationRoot,
+            var destination = Path.GetFullPath(Path.Combine(destinationRootPrefix,
                 archivePathName.Replace('/', Path.DirectorySeparatorChar)));
-            if (!LauncherPaths.IsUnder(destination, destinationRoot))
+            if (!destination.StartsWith(destinationRootPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException("快照包含越界路径，已拒绝恢复。");
             }
@@ -392,9 +396,9 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
         foreach (var record in manifest.Files)
         {
             var archivePathName = NormalizeArchivePath(record.Path);
-            var filePath = Path.GetFullPath(Path.Combine(destinationRoot,
+            var filePath = Path.GetFullPath(Path.Combine(destinationRootPrefix,
                 archivePathName.Replace('/', Path.DirectorySeparatorChar)));
-            if (!LauncherPaths.IsUnder(filePath, destinationRoot) ||
+            if (!filePath.StartsWith(destinationRootPrefix, StringComparison.OrdinalIgnoreCase) ||
                 !extractedFiles.Contains(archivePathName) ||
                 !File.Exists(filePath) || new FileInfo(filePath).Length != record.Length ||
                 !ComputeSha256(filePath).Equals(record.Sha256, StringComparison.OrdinalIgnoreCase))

@@ -22,20 +22,11 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
-        <LinearGradientBrush x:Key="PersonalAccentBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#9CE8D0" Offset="0" />
-            <GradientStop Color="#62BBD3" Offset="1" />
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="CompanyAccentBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#D7CEFF" Offset="0" />
-            <GradientStop Color="#9582FA" Offset="1" />
-        </LinearGradientBrush>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <LinearGradientBrush x:Key="CardSurfaceBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#D91A1F2B" Offset="0" />
             <GradientStop Color="#BE111621" Offset="1" />
         </LinearGradientBrush>
-        <SolidColorBrush x:Key="RunningBrush" Color="#68DEB1" />
-        <SolidColorBrush x:Key="IdleBrush" Color="#6F788D" />
         <SolidColorBrush x:Key="WarningBrush" Color="#F3C777" />
 
         <Style x:Key="EyebrowText" TargetType="TextBlock">
@@ -289,238 +280,259 @@
                                        VerticalAlignment="Center" />
                         </Grid>
                     </Border>
-
-                    <Grid Grid.Row="1">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border Grid.Column="0"
-                                CornerRadius="24"
-                                Background="{StaticResource CardSurfaceBrush}"
-                                BorderBrush="#2A3544"
-                                BorderThickness="1"
-                                Padding="26,24">
-                            <Border.Effect>
-                                <DropShadowEffect Color="#000000" BlurRadius="20" ShadowDepth="7" Opacity="0.22" />
-                            </Border.Effect>
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Border Width="46" Height="46" CornerRadius="15" Background="#17312F" BorderBrush="#295149" BorderThickness="1">
-                                            <Grid>
-                                                <Ellipse Width="12" Height="12" Fill="#9CE8D0" VerticalAlignment="Top" Margin="0,9,0,0" />
-                                                <Path Data="M 7,20 C 7,14 23,14 23,20"
-                                                      Stroke="#9CE8D0"
-                                                      StrokeThickness="2"
-                                                      StrokeStartLineCap="Round"
-                                                      StrokeEndLineCap="Round"
-                                                      Width="18"
-                                                      Height="9"
-                                                      Stretch="Fill"
-                                                      VerticalAlignment="Bottom"
-                                                      Margin="0,0,0,8" />
+                    <ScrollViewer Grid.Row="1"
+                                  Margin="-9,-9,-9,0"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Focusable="False">
+                        <ScrollViewer.Resources>
+                            <Style TargetType="ScrollBar">
+                                <Setter Property="Width" Value="10" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ScrollBar">
+                                            <Grid Background="{TemplateBinding Background}" Margin="3,0,0,0">
+                                                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                                    <Track.DecreaseRepeatButton>
+                                                        <RepeatButton Focusable="False" Command="ScrollBar.PageUpCommand">
+                                                            <RepeatButton.Template>
+                                                                <ControlTemplate TargetType="RepeatButton">
+                                                                    <Border Background="Transparent" />
+                                                                </ControlTemplate>
+                                                            </RepeatButton.Template>
+                                                        </RepeatButton>
+                                                    </Track.DecreaseRepeatButton>
+                                                    <Track.IncreaseRepeatButton>
+                                                        <RepeatButton Focusable="False" Command="ScrollBar.PageDownCommand">
+                                                            <RepeatButton.Template>
+                                                                <ControlTemplate TargetType="RepeatButton">
+                                                                    <Border Background="Transparent" />
+                                                                </ControlTemplate>
+                                                            </RepeatButton.Template>
+                                                        </RepeatButton>
+                                                    </Track.IncreaseRepeatButton>
+                                                    <Track.Thumb>
+                                                        <Thumb>
+                                                            <Thumb.Template>
+                                                                <ControlTemplate TargetType="Thumb">
+                                                                    <Border x:Name="ThumbChrome"
+                                                                            CornerRadius="5"
+                                                                            Background="#333C51"
+                                                                            Margin="1,0" />
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="ThumbChrome" Property="Background" Value="#4B5570" />
+                                                                        </Trigger>
+                                                                        <Trigger Property="IsDragging" Value="True">
+                                                                            <Setter TargetName="ThumbChrome" Property="Background" Value="#5A6580" />
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Thumb.Template>
+                                                        </Thumb>
+                                                    </Track.Thumb>
+                                                </Track>
                                             </Grid>
-                                        </Border>
-                                        <StackPanel Margin="14,1,0,0">
-                                            <TextBlock Text="PERSONAL" Style="{StaticResource EyebrowText}" Foreground="#69BFA9" />
-                                            <TextBlock Text="个人空间"
-                                                       FontFamily="{StaticResource DisplayFont}"
-                                                       FontSize="22"
-                                                       FontWeight="SemiBold"
-                                                       Margin="0,4,0,0" />
-                                        </StackPanel>
-                                    </StackPanel>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ScrollViewer.Resources>
 
-                                    <Border x:Name="PersonalStatusPill" Grid.Column="1" Style="{StaticResource StatusPill}" VerticalAlignment="Top">
-                                        <StackPanel Orientation="Horizontal">
-                                            <Ellipse x:Name="PersonalStatusDot" Width="6" Height="6" Fill="{StaticResource IdleBrush}" VerticalAlignment="Center" />
-                                            <TextBlock x:Name="PersonalStatusText"
-                                                       Text="检测中"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#AAB2C3"
-                                                       Margin="7,0,0,0" />
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-
-                                <TextBlock Grid.Row="1"
-                                           Text="完整保留你的 ChatGPT 登录、插件、任务历史与默认电脑能力。"
-                                           TextWrapping="Wrap"
-                                           Foreground="#929CB1"
-                                           FontSize="12"
-                                           LineHeight="19"
-                                           Margin="0,19,0,0" />
-
-                                <Grid Grid.Row="2" Margin="0,20,0,18">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="1" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Margin="0,0,18,0">
-                                        <TextBlock Text="AUTHENTICATION" Style="{StaticResource MetricCaption}" />
-                                        <TextBlock Text="ChatGPT Account" Style="{StaticResource MetricValue}" />
-                                    </StackPanel>
-                                    <Border Grid.Column="1" Background="#283041" />
-                                    <StackPanel Grid.Column="2" Margin="18,0,0,0">
-                                        <TextBlock Text="CODEX HOME" Style="{StaticResource MetricCaption}" />
-                                        <TextBlock x:Name="PersonalHomeText" Text="%USERPROFILE%\.codex" Style="{StaticResource MetricValue}" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <Button Grid.Row="3"
-                                        x:Name="LaunchPersonalButton"
-                                        Style="{StaticResource PrimaryButton}"
-                                        Background="{StaticResource PersonalAccentBrush}"
-                                        Click="LaunchPersonalButton_Click">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="18" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="LaunchPersonalButtonText"
-                                                   Text="启动个人 Codex"
-                                                   Foreground="#0B1716"
-                                                   FontWeight="Bold" />
-                                        <TextBlock Grid.Column="2" Text="↗" Foreground="#0B1716" FontSize="15" />
-                                    </Grid>
-                                </Button>
-                            </Grid>
-                        </Border>
-
-                        <Border Grid.Column="2"
-                                CornerRadius="24"
-                                Background="{StaticResource CardSurfaceBrush}"
-                                BorderBrush="#40395F"
-                                BorderThickness="1"
-                                Padding="26,24">
-                            <Border.Effect>
-                                <DropShadowEffect Color="#120A2E" BlurRadius="24" ShadowDepth="7" Opacity="0.32" />
-                            </Border.Effect>
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Border Width="46" Height="46" CornerRadius="15" Background="#292344" BorderBrush="#51457D" BorderThickness="1">
-                                            <Grid>
-                                                <Rectangle Width="21" Height="19" RadiusX="3" RadiusY="3" Fill="#BFB4FF" VerticalAlignment="Bottom" Margin="0,0,0,9" />
-                                                <Rectangle Width="13" Height="6" RadiusX="2" RadiusY="2" Fill="#BFB4FF" VerticalAlignment="Top" Margin="0,9,0,0" />
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,13">
-                                                    <Rectangle Width="2" Height="5" Fill="#312B4D" Margin="1,0" />
-                                                    <Rectangle Width="2" Height="5" Fill="#312B4D" Margin="1,0" />
-                                                    <Rectangle Width="2" Height="5" Fill="#312B4D" Margin="1,0" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                        <StackPanel Margin="14,1,0,0">
-                                            <TextBlock x:Name="WorkProfileEyebrowText" Text="ISOLATED PROFILE" Style="{StaticResource EyebrowText}" Foreground="#9B8FE6" />
-                                            <TextBlock x:Name="WorkProfileTitleText" Text="工作空间"
-                                                       FontFamily="{StaticResource DisplayFont}"
-                                                       FontSize="22"
-                                                       FontWeight="SemiBold"
-                                                       Margin="0,4,0,0" />
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <Border x:Name="CompanyStatusPill" Grid.Column="1" Style="{StaticResource StatusPill}" VerticalAlignment="Top">
-                                        <StackPanel Orientation="Horizontal">
-                                            <Ellipse x:Name="CompanyStatusDot" Width="6" Height="6" Fill="{StaticResource IdleBrush}" VerticalAlignment="Center" />
-                                            <TextBlock x:Name="CompanyStatusText"
-                                                       Text="检测中"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#AAB2C3"
-                                                       Margin="7,0,0,0" />
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-
-                                <TextBlock Grid.Row="1"
-                                           Text="独立持有配置、认证、任务与记忆；个人空间默认保持原样。"
-                                           TextWrapping="Wrap"
-                                           Foreground="#929CB1"
-                                           FontSize="12"
-                                           LineHeight="19"
-                                           Margin="0,19,0,0" />
-
-                                <Grid Grid.Row="2" Margin="0,20,0,18">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="1" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Margin="0,0,18,0">
-                                        <TextBlock Text="PROVIDER / MODEL" Style="{StaticResource MetricCaption}" />
-                                        <TextBlock x:Name="CompanyModelText" Text="尚未配置" Style="{StaticResource MetricValue}" />
-                                    </StackPanel>
-                                    <Border Grid.Column="1" Background="#302A47" />
-                                    <StackPanel Grid.Column="2" Margin="18,0,0,0">
-                                        <TextBlock Text="ENDPOINT" Style="{StaticResource MetricCaption}" />
-                                        <TextBlock x:Name="CompanyEndpointText" Text="等待首次配置" Style="{StaticResource MetricValue}" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <Grid Grid.Row="3">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="10" />
-                                        <ColumnDefinition Width="42" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button x:Name="LaunchCompanyButton"
-                                            Style="{StaticResource PrimaryButton}"
-                                            Background="{StaticResource CompanyAccentBrush}"
-                                            Click="LaunchCompanyButton_Click">
+                        <ItemsControl x:Name="ProfileCards">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Margin" Value="9" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="20"
+                                            Background="{StaticResource CardSurfaceBrush}"
+                                            BorderBrush="{Binding CardBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="22,20"
+                                            Tag="{Binding IdentityKey}">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="#000000" BlurRadius="20" ShadowDepth="7" Opacity="0.20" />
+                                        </Border.Effect>
                                         <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="18" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="LaunchCompanyButtonText"
-                                                       Text="配置工作空间"
-                                                       Foreground="#11101A"
-                                                       FontWeight="Bold" />
-                                            <TextBlock Grid.Column="2" Text="↗" Foreground="#11101A" FontSize="15" />
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Width="44"
+                                                            Height="44"
+                                                            CornerRadius="14"
+                                                            Background="{Binding AccentSoftBrush}"
+                                                            BorderBrush="{Binding CardBorderBrush}"
+                                                            BorderThickness="1">
+                                                        <TextBlock Text="{Binding IconGlyph}"
+                                                                   Foreground="{Binding AccentBrush}"
+                                                                   FontFamily="{StaticResource DisplayFont}"
+                                                                   FontSize="16"
+                                                                   FontWeight="Bold"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="13,1,0,0">
+                                                        <TextBlock Text="{Binding Eyebrow}"
+                                                                   Style="{StaticResource EyebrowText}"
+                                                                   Foreground="{Binding AccentBrush}" />
+                                                        <Grid Margin="0,4,0,0">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       ToolTip="{Binding Title}"
+                                                                       FontFamily="{StaticResource DisplayFont}"
+                                                                       FontSize="19"
+                                                                       FontWeight="SemiBold"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <Border Grid.Column="1"
+                                                                    CornerRadius="8"
+                                                                    Padding="7,2"
+                                                                    Background="{Binding AccentSoftBrush}"
+                                                                    Margin="9,0,0,0"
+                                                                    VerticalAlignment="Center"
+                                                                    Visibility="{Binding IsPersonal, Converter={StaticResource BoolToVisibility}}">
+                                                                <TextBlock Text="默认主空间"
+                                                                           FontSize="9.5"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{Binding AccentBrush}" />
+                                                            </Border>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <Border Grid.Column="1"
+                                                        Style="{StaticResource StatusPill}"
+                                                        Background="{Binding StatusBackgroundBrush}"
+                                                        BorderBrush="{Binding StatusBorderBrush}"
+                                                        VerticalAlignment="Top"
+                                                        Margin="14,0,0,0">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding StatusText}"
+                                                                   FontSize="10.5"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{Binding StatusBrush}"
+                                                                   Margin="6,0,0,0" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding Description}"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="#929CB1"
+                                                       FontSize="11.5"
+                                                       LineHeight="18"
+                                                       Margin="0,13,0,0" />
+
+                                            <Border Grid.Row="2"
+                                                    Margin="0,15,0,17"
+                                                    CornerRadius="13"
+                                                    Background="#A60E121C"
+                                                    BorderBrush="#232B3C"
+                                                    BorderThickness="1"
+                                                    Padding="14,11"
+                                                    VerticalAlignment="Top">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="1" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Margin="0,0,14,0">
+                                                        <TextBlock Text="{Binding PrimaryLabel}" Style="{StaticResource MetricCaption}" />
+                                                        <TextBlock Text="{Binding PrimaryValue}"
+                                                                   ToolTip="{Binding PrimaryValue}"
+                                                                   Style="{StaticResource MetricValue}" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="1" Background="#242C3E" />
+                                                    <StackPanel Grid.Column="2" Margin="14,0,0,0">
+                                                        <TextBlock Text="{Binding SecondaryLabel}" Style="{StaticResource MetricCaption}" />
+                                                        <TextBlock Text="{Binding SecondaryValue}"
+                                                                   ToolTip="{Binding SecondaryValue}"
+                                                                   Style="{StaticResource MetricValue}" />
+                                                    </StackPanel>
+
+                                                    <Border Grid.Row="1" Grid.ColumnSpan="3" Height="1" Background="#212839" Margin="0,10" />
+
+                                                    <StackPanel Grid.Row="2" Grid.ColumnSpan="3">
+                                                        <TextBlock Text="{Binding TertiaryLabel}" Style="{StaticResource MetricCaption}" />
+                                                        <TextBlock Text="{Binding TertiaryValue}"
+                                                                   ToolTip="{Binding TertiaryValue}"
+                                                                   Style="{StaticResource MetricValue}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
+                                            <Grid Grid.Row="3" VerticalAlignment="Bottom">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button Style="{StaticResource PrimaryButton}"
+                                                        Height="44"
+                                                        Click="ProfileLaunchButton_Click">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding ActionText}"
+                                                                   Foreground="#0C0D13"
+                                                                   FontWeight="Bold" />
+                                                        <TextBlock Text="↗"
+                                                                   Foreground="#0C0D13"
+                                                                   FontSize="15"
+                                                                   Margin="13,0,0,0"
+                                                                   Visibility="{Binding CanLaunch, Converter={StaticResource BoolToVisibility}}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1"
+                                                        Style="{StaticResource SecondaryButton}"
+                                                        Width="44"
+                                                        Height="44"
+                                                        Padding="0"
+                                                        Margin="10,0,0,0"
+                                                        Content="⚙"
+                                                        FontSize="15"
+                                                        ToolTip="打开该空间的配置中心"
+                                                        Tag="{Binding ProfileId}"
+                                                        Visibility="{Binding SettingsVisibility}"
+                                                        Click="ProfileSettingsButton_Click" />
+                                            </Grid>
                                         </Grid>
-                                    </Button>
-                                    <Button Grid.Column="2"
-                                            Style="{StaticResource SecondaryButton}"
-                                            Width="42"
-                                            Padding="0"
-                                            Content="⋯"
-                                            FontSize="18"
-                                            ToolTip="打开工作空间配置中心"
-                                            Click="OpenConfigurationCenterButton_Click" />
-                                </Grid>
-                            </Grid>
-                        </Border>
-                    </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
 
                     <Border Grid.Row="2"
                             Margin="0,20,0,0"
@@ -533,6 +545,7 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -548,7 +561,7 @@
                                            FontWeight="SemiBold"
                                            Foreground="#CFD4E0" />
                                 <TextBlock x:Name="ParallelSummaryText"
-                                           Text="默认关闭 · 两个实例不会被自动关闭或互相复用"
+                                           Text="默认关闭 · 不同实例不会被自动关闭或互相复用"
                                            FontSize="10.5"
                                            Foreground="#707B91"
                                            Margin="0,3,0,0" />
@@ -556,6 +569,12 @@
 
                             <Border Grid.Column="2" Width="1" Height="30" Background="#2B3244" Margin="0,0,16,0" />
                             <Button Grid.Column="3"
+                                    x:Name="NewProfileButton"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Content="新建隔离空间"
+                                    Margin="0,0,10,0"
+                                    Click="NewProfileButton_Click" />
+                            <Button Grid.Column="4"
                                     x:Name="RefreshButton"
                                     Style="{StaticResource SecondaryButton}"
                                     Content="刷新状态"

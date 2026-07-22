@@ -2,12 +2,14 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace CodexChannelLauncher.Core;
 
 public static class CompanyTrayIconBranding
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
+    public const string DefaultBadgeColor = "#7C3AED";
 
     private static readonly string[] ManagedRelativePaths =
     [
@@ -24,8 +26,16 @@ public static class CompanyTrayIconBranding
     public static TrayBrandingResult Apply(
         string sourceApp,
         string targetApp,
+        LauncherLog? log = null) =>
+        Apply(sourceApp, targetApp, DefaultBadgeColor, log);
+
+    public static TrayBrandingResult Apply(
+        string sourceApp,
+        string targetApp,
+        string badgeColor,
         LauncherLog? log = null)
     {
+        var parsedBadgeColor = ParseBadgeColor(badgeColor);
         var missing = ManagedRelativePaths
             .Where(relative => !File.Exists(Path.Combine(sourceApp, relative)))
             .ToArray();
@@ -48,7 +58,7 @@ public static class CompanyTrayIconBranding
                 Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
                 var temporaryPath = targetPath + $".company-branding-{Guid.NewGuid():N}.tmp";
                 pending.Add((relativePath, temporaryPath, targetPath));
-                WriteBrandedIcon(sourcePath, temporaryPath);
+                WriteBrandedIcon(sourcePath, temporaryPath, parsedBadgeColor);
                 ValidateReadableIcon(temporaryPath);
             }
 
@@ -62,7 +72,7 @@ public static class CompanyTrayIconBranding
                 true,
                 CurrentVersion,
                 hashes,
-                "工作空间托盘图标已叠加紫色右下角角标。");
+                $"工作空间托盘图标已叠加 {badgeColor.ToUpperInvariant()} 右下角角标。");
             log?.Info($"Company tray branding applied: version={CurrentVersion}, files={hashes.Count}");
             return result;
         }
@@ -190,10 +200,13 @@ public static class CompanyTrayIconBranding
         }
     }
 
-    private static void WriteBrandedIcon(string sourcePath, string destinationPath)
+    private static void WriteBrandedIcon(
+        string sourcePath,
+        string destinationPath,
+        Color badgeColor)
     {
         var images = IconSizes
-            .Select(size => RenderFrame(sourcePath, size))
+            .Select(size => RenderFrame(sourcePath, size, badgeColor))
             .ToArray();
 
         using var stream = new FileStream(destinationPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
@@ -223,7 +236,7 @@ public static class CompanyTrayIconBranding
         }
     }
 
-    private static byte[] RenderFrame(string sourcePath, int size)
+    private static byte[] RenderFrame(string sourcePath, int size, Color badgeColor)
     {
         using var sourceIcon = LoadIcon(sourcePath, size);
         using var sourceBitmap = sourceIcon.ToBitmap();
@@ -237,7 +250,7 @@ public static class CompanyTrayIconBranding
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
             graphics.DrawImage(sourceBitmap, new Rectangle(0, 0, size, size));
-            DrawBadge(graphics, size);
+            DrawBadge(graphics, size, badgeColor);
         }
 
         using var output = new MemoryStream();
@@ -257,7 +270,7 @@ public static class CompanyTrayIconBranding
         }
     }
 
-    private static void DrawBadge(Graphics graphics, int size)
+    private static void DrawBadge(Graphics graphics, int size, Color color)
     {
         var diameter = Math.Max(6, (int)Math.Round(size * 0.40));
         var margin = Math.Max(0, (int)Math.Round(size * 0.025));
@@ -267,13 +280,24 @@ public static class CompanyTrayIconBranding
 
         using var shadowBrush = new SolidBrush(Color.FromArgb(110, 15, 18, 28));
         using var borderBrush = new SolidBrush(Color.FromArgb(255, 246, 243, 255));
-        using var badgeBrush = new SolidBrush(Color.FromArgb(255, 124, 58, 237));
+        using var badgeBrush = new SolidBrush(Color.FromArgb(255, color.R, color.G, color.B));
 
         var shadow = outer;
         shadow.Offset(Math.Max(1, size / 64), Math.Max(1, size / 64));
         graphics.FillEllipse(shadowBrush, shadow);
         graphics.FillEllipse(borderBrush, outer);
         graphics.FillEllipse(badgeBrush, inner);
+    }
+
+    private static Color ParseBadgeColor(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            !Regex.IsMatch(value, "^#[0-9A-Fa-f]{6}$", RegexOptions.CultureInvariant))
+        {
+            throw new ArgumentException("角标颜色必须是 #RRGGBB 格式。", nameof(value));
+        }
+
+        return ColorTranslator.FromHtml(value);
     }
 
     private static void RestoreOfficialIcons(string sourceApp, string targetApp)

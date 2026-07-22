@@ -10,8 +10,22 @@ public sealed class ProfileMergeService(
     private const string OperationGateName = @"Local\CodexChannelLauncher.ConfigurationOperation";
     private MergeBaseStore BaseStore => new(paths.MergeBaseDirectory);
 
-    public bool IsCompanyRunning() => ProcessInventory.GetChatGptRoots()
-        .Any(process => LauncherPaths.IsUnder(process.ExecutablePath, paths.RuntimeCacheRoot));
+    public bool IsCompanyRunning()
+    {
+        var registration = profileManager.GetProfiles().FirstOrDefault(profile =>
+            profile.ProfileDirectoryName.Equals(
+                paths.WorkProfileDirectoryName,
+                StringComparison.OrdinalIgnoreCase));
+        if (registration is null)
+        {
+            return false;
+        }
+
+        var state = new StateStore(paths).Load();
+        return state.ProfileRootProcesses is not null &&
+               state.ProfileRootProcesses.TryGetValue(registration.ProfileId, out var marker) &&
+               ProcessInventory.IsAlive(marker);
+    }
 
     public bool IsPersonalRunning() => ProcessInventory.GetChatGptRoots()
         .Any(process => !LauncherPaths.IsUnder(process.ExecutablePath, paths.RuntimeCacheRoot));

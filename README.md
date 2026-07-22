@@ -123,7 +123,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\audit-repository
 - **Chrome / 电脑操作**：工作空间插件安装状态、开关和 Windows 应用允许列表；
 - **MCP**：对比两侧列表，迁移不含静态凭据的配置，新增、编辑、启停或删除工作空间 MCP；
 - **权限**：工作空间 approval、sandbox、network 和 Windows sandbox 配置；
-- **快照 / 恢复**：变更前自动快照并支持手动恢复，始终排除 `auth.json`。
+- **快照 / 恢复**：变更前自动快照并支持手动恢复，始终排除 `auth.json`；
+- **删除工作空间**：默认只移除多开器入口并保留本地数据；只有显式勾选“同时删除本地内容”才清理该空间的 Codex Home、Electron 数据、快照、合并基线和专属运行副本。
 
 写入工作空间配置前需要退出工作空间 App。双向合并会修改箭头指向的目标侧，因此要求两个 App 都退出；任何指向个人侧的写入都由用户显式选择并再次确认。
 

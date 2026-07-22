@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -10,9 +12,12 @@ namespace CodexChannelLauncher;
 
 public partial class ConfigurationCenterWindow : Window
 {
+    private sealed record ConfirmationChoice(bool Confirmed, bool DeleteLocalContent);
+
     private readonly ProfileCoordinator coordinator;
     private readonly ConfigurationCenterService service;
     private readonly string profileId;
+    private readonly ManagedProfileRegistration profileRegistration;
     private readonly string? previewOutput;
     private bool isBusy;
     private bool isRendering;
@@ -21,16 +26,18 @@ public partial class ConfigurationCenterWindow : Window
     private bool chromeInstalled;
     private bool computerUseInstalled;
     private MemoryComparisonInfo? memoryComparison;
+    private TaskCompletionSource<ConfirmationChoice>? confirmationCompletion;
 
     public ConfigurationCenterWindow(ProfileCoordinator coordinator, string? previewOutput = null)
     {
         this.coordinator = coordinator;
         service = coordinator.ConfigurationCenter;
-        profileId = coordinator.GetProfiles().FirstOrDefault(profile =>
+        profileRegistration = coordinator.GetProfiles().FirstOrDefault(profile =>
             profile.ProfileDirectoryName.Equals(
                 coordinator.Paths.WorkProfileDirectoryName,
-                StringComparison.OrdinalIgnoreCase))?.ProfileId
+                StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("当前隔离空间未注册，无法打开配置中心。");
+        profileId = profileRegistration.ProfileId;
         this.previewOutput = string.IsNullOrWhiteSpace(previewOutput) ? null : previewOutput;
         InitializeComponent();
         ProfilePathText.Text = coordinator.Paths.CompanyCodexHome;
@@ -38,6 +45,10 @@ public partial class ConfigurationCenterWindow : Window
         McpTypeBox.SelectedIndex = 0;
         Loaded += ConfigurationCenterWindow_Loaded;
     }
+
+    public bool ProfileDeleted { get; private set; }
+
+    public string? ProfileDeletionMessage { get; private set; }
 
     private async void ConfigurationCenterWindow_Loaded(object sender, RoutedEventArgs e)
     {
@@ -61,6 +72,31 @@ public partial class ConfigurationCenterWindow : Window
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && ConfirmOverlay.Visibility == Visibility.Visible)
+        {
+            CompleteConfirmation(false);
+            e.Handled = true;
+        }
+    }
+
+    private void Window_Closing(object? sender, CancelEventArgs e)
+    {
+        if (ConfirmOverlay.Visibility == Visibility.Visible)
+        {
+            e.Cancel = true;
+            CompleteConfirmation(false);
+            return;
+        }
+
+        if (isBusy && !ProfileDeleted)
+        {
+            e.Cancel = true;
+            SetFooter("当前配置操作尚未完成，请稍候。", true);
+        }
+    }
+
     private async void EditWorkProfileButton_Click(object sender, RoutedEventArgs e)
     {
         if (isBusy || companyRunning)
@@ -79,6 +115,53 @@ public partial class ConfigurationCenterWindow : Window
             ProfilePathText.Text = coordinator.Paths.CompanyCodexHome;
             ProfilePathText.ToolTip = coordinator.Paths.CompanyCodexHome;
             await RefreshAllAsync(true);
+        }
+    }
+
+    private async void DeleteWorkProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (isBusy || companyRunning)
+        {
+            SetFooter("请先完全退出该工作空间 App，再删除工作空间。", true);
+            return;
+        }
+
+        var confirmation = await ConfirmAsync(
+            $"“{profileRegistration.DisplayName}”将从多开器中移除。默认会保留全部本地数据，以便之后重新导入。",
+            "删除工作空间",
+            "删除工作空间",
+            showDeleteLocalOption: true,
+            localContentHint:
+            $"勾选后将永久删除 Codex Home、界面数据、快照、合并基线和专属运行副本。\n{coordinator.Paths.WorkProfileRoot}");
+        if (!confirmation.Confirmed)
+        {
+            return;
+        }
+
+        SetBusy(true, "正在安全移除工作空间…");
+        try
+        {
+            var result = await Task.Run(() => coordinator.DeleteWorkProfile(
+                profileId,
+                confirmation.DeleteLocalContent));
+            ProfileDeleted = true;
+            ProfileDeletionMessage = result.CleanupPendingPath is not null
+                ? $"{result.DisplayName} 已移除；部分本地内容等待清理：{result.CleanupPendingPath}"
+                : result.LocalContentDeleted
+                    ? $"{result.DisplayName} 及其本地内容已删除。"
+                    : $"{result.DisplayName} 已从多开器移除，本地内容仍保留在 {result.RetainedDataRoot}";
+            Close();
+        }
+        catch (Exception exception)
+        {
+            SetFooter(exception.Message, true);
+        }
+        finally
+        {
+            if (!ProfileDeleted)
+            {
+                SetBusy(false, null);
+            }
         }
     }
 
@@ -142,6 +225,7 @@ public partial class ConfigurationCenterWindow : Window
                         ? "个人 App 正在运行 · 工作空间配置可修改，双向合并需先退出个人 App"
                         : "双目录隔离已就绪 · 可以安全修改或双向合并";
             ProfileStateDot.Fill = Brush(companyRunning || personalRunning ? "#F3C777" : "#68DEB1");
+            DeleteWorkProfileButton.IsEnabled = !companyRunning;
 
             OverviewSkillCountText.Text = data.Skills.Count.ToString();
             OverviewMcpCountText.Text = data.Mcp.Count(item => item.CompanyExists).ToString();
@@ -254,9 +338,11 @@ public partial class ConfigurationCenterWindow : Window
             return;
         }
 
-        if (!Confirm(
-                $"采用个人空间的 {selected.Name} 完整版本到工作空间？目标侧会先自动快照；个人与工作空间 App 都必须已退出。",
-                "个人 → 工作空间"))
+        var confirmation = await ConfirmAsync(
+            $"采用个人空间的 {selected.Name} 完整版本到工作空间？目标侧会先自动快照；个人与工作空间 App 都必须已退出。",
+            "个人 → 工作空间",
+            "采用个人版本");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -287,10 +373,16 @@ public partial class ConfigurationCenterWindow : Window
 
     private async void ExportSkillButton_Click(object sender, RoutedEventArgs e)
     {
-        if (SkillList.SelectedItem is not SkillComparisonItem selected ||
-            !Confirm(
-                $"采用工作空间的 {selected.Name} 完整版本到个人空间？这会修改个人 Skill，个人侧会先自动快照；两个 App 都必须已退出。",
-                "工作空间 → 个人"))
+        if (SkillList.SelectedItem is not SkillComparisonItem selected)
+        {
+            return;
+        }
+
+        var confirmation = await ConfirmAsync(
+            $"采用工作空间的 {selected.Name} 完整版本到个人空间？这会修改个人 Skill，个人侧会先自动快照；两个 App 都必须已退出。",
+            "工作空间 → 个人",
+            "采用工作空间版本");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -354,10 +446,16 @@ public partial class ConfigurationCenterWindow : Window
 
     private async void MergeGlobalRuleToCompanyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (GlobalRuleList.SelectedItem is not GlobalRuleComparisonItem selected ||
-            !Confirm(
-                $"采用个人空间的 {selected.FileName} 完整版本到工作空间？工作空间侧会先自动快照；两个 App 都必须已退出。",
-                "个人 → 工作空间"))
+        if (GlobalRuleList.SelectedItem is not GlobalRuleComparisonItem selected)
+        {
+            return;
+        }
+
+        var confirmation = await ConfirmAsync(
+            $"采用个人空间的 {selected.FileName} 完整版本到工作空间？工作空间侧会先自动快照；两个 App 都必须已退出。",
+            "个人 → 工作空间",
+            "采用个人版本");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -370,10 +468,16 @@ public partial class ConfigurationCenterWindow : Window
 
     private async void MergeGlobalRuleToPersonalButton_Click(object sender, RoutedEventArgs e)
     {
-        if (GlobalRuleList.SelectedItem is not GlobalRuleComparisonItem selected ||
-            !Confirm(
-                $"采用工作空间的 {selected.FileName} 完整版本到个人空间？这会修改个人全局规则，个人侧会先自动快照；两个 App 都必须已退出。",
-                "工作空间 → 个人"))
+        if (GlobalRuleList.SelectedItem is not GlobalRuleComparisonItem selected)
+        {
+            return;
+        }
+
+        var confirmation = await ConfirmAsync(
+            $"采用工作空间的 {selected.FileName} 完整版本到个人空间？这会修改个人全局规则，个人侧会先自动快照；两个 App 都必须已退出。",
+            "工作空间 → 个人",
+            "采用工作空间版本");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -386,9 +490,11 @@ public partial class ConfigurationCenterWindow : Window
 
     private async void MergeMemoriesToCompanyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!Confirm(
-                "把个人 Memories 合并到工作空间？同路径冲突采用个人版本，工作空间独有文件保留；工作空间侧会先自动快照，且两个 App 都必须已退出。",
-                "个人 → 工作空间"))
+        var confirmation = await ConfirmAsync(
+            "把个人 Memories 合并到工作空间？同路径冲突采用个人版本，工作空间独有文件保留；工作空间侧会先自动快照，且两个 App 都必须已退出。",
+            "个人 → 工作空间",
+            "合并到工作空间");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -401,9 +507,11 @@ public partial class ConfigurationCenterWindow : Window
 
     private async void MergeMemoriesToPersonalButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!Confirm(
-                "把工作空间 Memories 合并到个人空间？同路径冲突采用工作空间版本，个人独有文件保留；个人侧会先自动快照，且两个 App 都必须已退出。",
-                "工作空间 → 个人"))
+        var confirmation = await ConfirmAsync(
+            "把工作空间 Memories 合并到个人空间？同路径冲突采用工作空间版本，个人独有文件保留；个人侧会先自动快照，且两个 App 都必须已退出。",
+            "工作空间 → 个人",
+            "合并到个人空间");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -593,8 +701,16 @@ public partial class ConfigurationCenterWindow : Window
 
     private async void RemoveMcpButton_Click(object sender, RoutedEventArgs e)
     {
-        if (McpList.SelectedItem is not McpComparisonItem selected ||
-            !Confirm($"确认从工作空间配置中删除 MCP {selected.Name}？个人配置不会变化。", "删除 MCP"))
+        if (McpList.SelectedItem is not McpComparisonItem selected)
+        {
+            return;
+        }
+
+        var confirmation = await ConfirmAsync(
+            $"确认从工作空间配置中删除 MCP {selected.Name}？个人配置不会变化。",
+            "删除 MCP",
+            "删除 MCP");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -677,11 +793,16 @@ public partial class ConfigurationCenterWindow : Window
             NetworkToggle.IsChecked == true,
             ComboValue(WindowsSandboxBox),
             false);
-        if (settings.IsFullAccess && !Confirm(
-                "Full Access 会使用 never + danger-full-access，并允许 elevated Windows sandbox。确认仅对工作空间 App 应用？",
-                "确认高风险权限"))
+        if (settings.IsFullAccess)
         {
-            return;
+            var confirmation = await ConfirmAsync(
+                "Full Access 会使用 never + danger-full-access，并允许 elevated Windows sandbox。确认仅对工作空间 App 应用？",
+                "确认高风险权限",
+                "启用 Full Access");
+            if (!confirmation.Confirmed)
+            {
+                return;
+            }
         }
 
         await RunMutationAsync(
@@ -701,10 +822,16 @@ public partial class ConfigurationCenterWindow : Window
 
     private async void RestoreSnapshotButton_Click(object sender, RoutedEventArgs e)
     {
-        if (SnapshotList.SelectedItem is not SnapshotSummary selected ||
-            !Confirm(
-                $"恢复 {selected.DisplayName}？恢复前会再自动保存当前{(selected.Target == "personal" ? "个人" : "工作空间")}状态，auth.json 不会被改动。",
-                "恢复配置快照"))
+        if (SnapshotList.SelectedItem is not SnapshotSummary selected)
+        {
+            return;
+        }
+
+        var confirmation = await ConfirmAsync(
+            $"恢复 {selected.DisplayName}？恢复前会再自动保存当前{(selected.Target == "personal" ? "个人" : "工作空间")}状态，auth.json 不会被改动。",
+            "恢复配置快照",
+            "恢复快照");
+        if (!confirmation.Confirmed)
         {
             return;
         }
@@ -765,6 +892,7 @@ public partial class ConfigurationCenterWindow : Window
         SaveCapabilitiesButton.IsEnabled = !busy && !companyRunning;
         ChromeSettingsButton.IsEnabled = !busy;
         ComputerSettingsButton.IsEnabled = !busy;
+        DeleteWorkProfileButton.IsEnabled = !busy && !companyRunning;
         if (message is not null)
         {
             SetFooter(message, false);
@@ -833,8 +961,66 @@ public partial class ConfigurationCenterWindow : Window
     private static SolidColorBrush Brush(string color) =>
         new((Color)ColorConverter.ConvertFromString(color));
 
-    private bool Confirm(string message, string title) =>
-        MessageBox.Show(this, message, title, MessageBoxButton.OKCancel, MessageBoxImage.Warning) == MessageBoxResult.OK;
+    private Task<ConfirmationChoice> ConfirmAsync(
+        string message,
+        string title,
+        string confirmText,
+        bool showDeleteLocalOption = false,
+        string? localContentHint = null)
+    {
+        if (confirmationCompletion is not null)
+        {
+            CompleteConfirmation(false);
+        }
+
+        confirmationCompletion = new TaskCompletionSource<ConfirmationChoice>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        ConfirmTitleText.Text = title;
+        ConfirmBodyText.Text = message;
+        ConfirmAcceptButton.Content = confirmText;
+        ConfirmDeleteLocalContentCheckBox.IsChecked = false;
+        ConfirmLocalContentHintText.Text = localContentHint ?? string.Empty;
+        ConfirmLocalContentPanel.Visibility = showDeleteLocalOption
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        foreach (UIElement child in RootContent.Children)
+        {
+            if (!ReferenceEquals(child, ConfirmOverlay))
+            {
+                child.IsEnabled = false;
+            }
+        }
+
+        ConfirmOverlay.IsEnabled = true;
+        ConfirmOverlay.Visibility = Visibility.Visible;
+        ConfirmCancelButton.Focus();
+        return confirmationCompletion.Task;
+    }
+
+    private void ConfirmCancelButton_Click(object sender, RoutedEventArgs e) => CompleteConfirmation(false);
+
+    private void ConfirmAcceptButton_Click(object sender, RoutedEventArgs e) => CompleteConfirmation(true);
+
+    private void CompleteConfirmation(bool confirmed)
+    {
+        if (confirmationCompletion is null)
+        {
+            return;
+        }
+
+        var completion = confirmationCompletion;
+        var deleteLocalContent = confirmed &&
+                                 ConfirmLocalContentPanel.Visibility == Visibility.Visible &&
+                                 ConfirmDeleteLocalContentCheckBox.IsChecked == true;
+        confirmationCompletion = null;
+        ConfirmOverlay.Visibility = Visibility.Collapsed;
+        foreach (UIElement child in RootContent.Children)
+        {
+            child.IsEnabled = true;
+        }
+
+        completion.TrySetResult(new ConfirmationChoice(confirmed, deleteLocalContent));
+    }
 
     private void OpenFolder(string path)
     {

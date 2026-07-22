@@ -28,6 +28,8 @@ Codex 多开器
 
 新建隔离空间先在运行根目录下的 staging 目录完成配置、认证和 marker，再以目录移动提交。注册表、配置与 API Key 文件采用临时文件、刷新磁盘并原子替换。API Key 不进入错误信息、日志、注册、marker 或快照。
 
+删除工作空间默认只从 `profiles.json` 注销，保留全部本地内容供后续重新导入。用户显式选择同时删除本地内容时，Profile、快照、合并基线和专属运行副本会先移动到 staging 隔离目录；注册表提交失败时按逆序移回，提交成功后才清理隔离目录。运行中的 Profile 一律拒绝删除，个人 Codex Home 永不进入删除集合。
+
 认证模式由注册表明确记录：`ChatGptAccount`、`OpenAiApiKey`、`CustomResponses`。切换认证模式时会先校验新模式所需字段；切换到账号模式只在用户明确保存后移除旧 API Key 文件。
 
 ## Import allowlist

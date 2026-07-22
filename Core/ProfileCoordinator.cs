@@ -92,6 +92,62 @@ public sealed class ProfileCoordinator
         return profileManager.ReadMetadata(registration.ProfileId);
     }
 
+    public ProfileDeletionResult DeleteWorkProfile(string profileId, bool deleteLocalContent)
+    {
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            throw new ArgumentException("必须指定要删除的工作空间。", nameof(profileId));
+        }
+
+        using var crossProcessGate = new Semaphore(1, 1, CrossProcessGateName);
+        var crossProcessGateHeld = crossProcessGate.WaitOne(TimeSpan.FromSeconds(45));
+        if (!crossProcessGateHeld)
+        {
+            throw new TimeoutException("另一个多开器窗口正在执行实例操作，请稍后重试。");
+        }
+
+        try
+        {
+            var registration = ResolveRegistration(profileId);
+            if (IsManagedProfileRunning(profileId))
+            {
+                throw new InvalidOperationException(
+                    $"请先完全退出 {registration.DisplayName}，再删除工作空间。");
+            }
+
+            var result = profileManager.Delete(profileId, deleteLocalContent);
+            try
+            {
+                var state = stateStore.Load();
+                state.ProfileRootProcesses ??=
+                    new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
+                state.ProfileRootProcesses.Remove(profileId);
+                if (string.Equals(
+                        state.LastLaunchProfileId,
+                        profileId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    state.LastLaunchProfileId = null;
+                }
+
+                stateStore.Save(state);
+            }
+            catch (Exception exception)
+            {
+                log.Error($"Deleted profile state cleanup failed: profile={profileId}", exception);
+            }
+
+            log.Info(
+                $"Profile deleted: profile={profileId}, localContentDeleted={deleteLocalContent}, " +
+                $"cleanupPending={result.CleanupPendingPath is not null}");
+            return result;
+        }
+        finally
+        {
+            crossProcessGate.Release();
+        }
+    }
+
     public RuntimeStatus GetStatus()
     {
         CodexPackageInfo? package = null;

@@ -253,6 +253,113 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
+    public void DeleteProfileKeepsLocalContentByDefaultAndOnlyRemovesRegistration()
+    {
+        using var fixture = new TestFixture();
+        var personalBefore = fixture.FingerprintPersonalFiles();
+        var first = fixture.Manager.Configure(fixture.CreateRequest("first-key", displayName: "First"));
+        var second = fixture.Manager.Configure(fixture.CreateRequest("second-key", displayName: "Second"));
+        var profileRoot = Path.Combine(fixture.Paths.ProfilesRoot, first.ProfileDirectoryName);
+        var snapshotRoot = Path.Combine(fixture.Paths.RuntimeRoot, "snapshots", first.ProfileDirectoryName);
+        var mergeRoot = Path.Combine(fixture.Paths.RuntimeRoot, "merge-bases", first.ProfileDirectoryName);
+        var runtimeRoot = CreateRuntimeCache(fixture.Paths, first.ProfileId, "first-cache");
+        Directory.CreateDirectory(mergeRoot);
+        File.WriteAllText(Path.Combine(mergeRoot, "baseline.txt"), "keep-me");
+
+        var result = fixture.Manager.Delete(first.ProfileId, deleteLocalContent: false);
+
+        Assert.False(result.LocalContentDeleted);
+        Assert.Equal(profileRoot, result.RetainedDataRoot);
+        Assert.Null(result.CleanupPendingPath);
+        Assert.True(Directory.Exists(profileRoot));
+        Assert.True(Directory.Exists(snapshotRoot));
+        Assert.True(Directory.Exists(mergeRoot));
+        Assert.True(Directory.Exists(runtimeRoot));
+        Assert.Equal(second.ProfileId, Assert.Single(fixture.Manager.GetProfiles()).ProfileId);
+        Assert.Equal(personalBefore, fixture.FingerprintPersonalFiles());
+    }
+
+    [Fact]
+    public void DeleteProfileWithLocalContentRemovesOnlyOwnedData()
+    {
+        using var fixture = new TestFixture();
+        var personalBefore = fixture.FingerprintPersonalFiles();
+        var first = fixture.Manager.Configure(fixture.CreateRequest("first-key", displayName: "First"));
+        var second = fixture.Manager.Configure(fixture.CreateRequest("second-key", displayName: "Second"));
+        var firstProfileRoot = Path.Combine(fixture.Paths.ProfilesRoot, first.ProfileDirectoryName);
+        var secondProfileRoot = Path.Combine(fixture.Paths.ProfilesRoot, second.ProfileDirectoryName);
+        var snapshotRoot = Path.Combine(fixture.Paths.RuntimeRoot, "snapshots", first.ProfileDirectoryName);
+        var mergeRoot = Path.Combine(fixture.Paths.RuntimeRoot, "merge-bases", first.ProfileDirectoryName);
+        Directory.CreateDirectory(mergeRoot);
+        File.WriteAllText(Path.Combine(mergeRoot, "baseline.txt"), "delete-me");
+        var firstRuntimeRoot = CreateRuntimeCache(fixture.Paths, first.ProfileId, "first-cache");
+        var secondRuntimeRoot = CreateRuntimeCache(fixture.Paths, second.ProfileId, "second-cache");
+
+        var result = fixture.Manager.Delete(first.ProfileId, deleteLocalContent: true);
+
+        Assert.True(result.LocalContentDeleted);
+        Assert.Null(result.RetainedDataRoot);
+        Assert.Null(result.CleanupPendingPath);
+        Assert.False(Directory.Exists(firstProfileRoot));
+        Assert.False(Directory.Exists(snapshotRoot));
+        Assert.False(Directory.Exists(mergeRoot));
+        Assert.False(Directory.Exists(firstRuntimeRoot));
+        Assert.True(Directory.Exists(secondProfileRoot));
+        Assert.True(Directory.Exists(secondRuntimeRoot));
+        Assert.Equal(second.ProfileId, Assert.Single(fixture.Manager.GetProfiles()).ProfileId);
+        Assert.Equal(personalBefore, fixture.FingerprintPersonalFiles());
+    }
+
+    [Fact]
+    public void DeleteUnknownProfileDoesNotChangeExistingProfiles()
+    {
+        using var fixture = new TestFixture();
+        var registration = fixture.Manager.Configure(fixture.CreateRequest("profile-key"));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            fixture.Manager.Delete(Guid.NewGuid().ToString("N"), deleteLocalContent: true));
+
+        Assert.Equal(registration.ProfileId, Assert.Single(fixture.Manager.GetProfiles()).ProfileId);
+        Assert.True(Directory.Exists(Path.Combine(
+            fixture.Paths.ProfilesRoot,
+            registration.ProfileDirectoryName)));
+    }
+
+    [Fact]
+    public void DeleteWithLocalContentRollsDirectoriesBackWhenRegistryCommitFails()
+    {
+        using var fixture = new TestFixture();
+        var registration = fixture.Manager.Configure(fixture.CreateRequest("profile-key"));
+        var profileRoot = Path.Combine(fixture.Paths.ProfilesRoot, registration.ProfileDirectoryName);
+        var mergeRoot = Path.Combine(
+            fixture.Paths.RuntimeRoot,
+            "merge-bases",
+            registration.ProfileDirectoryName);
+        Directory.CreateDirectory(mergeRoot);
+        File.WriteAllText(Path.Combine(mergeRoot, "baseline.txt"), "must-survive");
+        var runtimeRoot = CreateRuntimeCache(fixture.Paths, registration.ProfileId, "profile-cache");
+
+        using (File.Open(
+                   fixture.Paths.ProfilesRegistryFile,
+                   FileMode.Open,
+                   FileAccess.Read,
+                   FileShare.Read))
+        {
+            var exception = Assert.ThrowsAny<Exception>(() =>
+                fixture.Manager.Delete(registration.ProfileId, deleteLocalContent: true));
+            Assert.True(exception is IOException or UnauthorizedAccessException);
+        }
+
+        Assert.True(Directory.Exists(profileRoot));
+        Assert.True(Directory.Exists(mergeRoot));
+        Assert.True(Directory.Exists(runtimeRoot));
+        Assert.Equal(registration.ProfileId, Assert.Single(fixture.Manager.GetProfiles()).ProfileId);
+        Assert.Empty(Directory.EnumerateDirectories(
+            fixture.Paths.OperationStagingRoot,
+            "profile-delete-*"));
+    }
+
+    [Fact]
     public void MissingRegisteredDirectoryIsNotReusedByANewProfile()
     {
         using var fixture = new TestFixture();
@@ -560,6 +667,17 @@ public sealed class WorkProfileManagerTests
         }
 
         return Convert.ToHexString(hash.GetHashAndReset());
+    }
+
+    private static string CreateRuntimeCache(LauncherPaths paths, string profileId, string directoryName)
+    {
+        var root = Path.Combine(paths.RuntimeCacheRoot, "versions", directoryName);
+        Directory.CreateDirectory(root);
+        File.WriteAllText(
+            Path.Combine(root, "cache-manifest.json"),
+            JsonSerializer.Serialize(new { ProfileId = profileId }));
+        File.WriteAllText(Path.Combine(root, "payload.bin"), "runtime-copy");
+        return root;
     }
 
     private sealed class TestFixture : IDisposable

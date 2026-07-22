@@ -215,6 +215,44 @@ public sealed class WorkProfileManagerTests
         Assert.Equal("updated-model", metadata.Model);
     }
 
+    [Fact]
+    public void RestoreRejectsArchiveTraversalWithoutWritingOutsideTheStagingDirectory()
+    {
+        using var fixture = new TestFixture();
+        var archivePath = Path.Combine(fixture.Paths.SnapshotDirectory, "malicious.zip");
+        var escapedPath = Path.Combine(fixture.Paths.OperationStagingRoot, "escaped.txt");
+        var payload = Encoding.UTF8.GetBytes("must-not-be-extracted");
+        var manifest = new ProfileSnapshotManifest(
+            "malicious",
+            DateTime.UtcNow,
+            "security-test",
+            false,
+            false,
+            [new SnapshotFileRecord(
+                "profile/../../escaped.txt",
+                payload.Length,
+                Convert.ToHexString(SHA256.HashData(payload)))],
+            "company",
+            true);
+
+        using (var file = File.Create(archivePath))
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create))
+        {
+            var manifestEntry = archive.CreateEntry("manifest.json");
+            using (var writer = new StreamWriter(manifestEntry.Open(), new UTF8Encoding(false)))
+            {
+                writer.Write(JsonSerializer.Serialize(manifest));
+            }
+
+            var maliciousEntry = archive.CreateEntry("profile/../../escaped.txt");
+            using var entryStream = maliciousEntry.Open();
+            entryStream.Write(payload);
+        }
+
+        Assert.Throws<InvalidDataException>(() => fixture.Snapshots.Restore(archivePath));
+        Assert.False(File.Exists(escapedPath));
+    }
+
     private static void CreateImportSource(string source, string apiKey)
     {
         Directory.CreateDirectory(source);

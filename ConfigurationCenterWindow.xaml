@@ -13,6 +13,8 @@
         Background="Transparent"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Closing="Window_Closing"
         SourceInitialized="Window_SourceInitialized">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="58"
@@ -186,6 +188,9 @@
                                 Content="编辑连接" Click="EditWorkProfileButton_Click" />
                         <Button Style="{StaticResource SecondaryButton}" Height="36" Margin="9,0,0,0"
                                 Content="打开配置目录" Click="OpenCompanyFolderButton_Click" />
+                        <Button x:Name="DeleteWorkProfileButton" Style="{StaticResource DangerButton}"
+                                Height="36" Margin="9,0,0,0" Content="删除工作空间"
+                                Click="DeleteWorkProfileButton_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -680,6 +685,92 @@
                             Content="关闭" Click="CloseButton_Click" />
                 </Grid>
             </Border>
+
+            <Grid x:Name="ConfirmOverlay"
+                  Grid.RowSpan="4"
+                  Panel.ZIndex="200"
+                  Background="#C9000000"
+                  Focusable="True"
+                  Visibility="Collapsed">
+                <Border Width="520"
+                        Padding="24"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="#111622"
+                        BorderBrush="#414A60"
+                        BorderThickness="1"
+                        CornerRadius="18">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="32" ShadowDepth="10" Opacity="0.65" />
+                    </Border.Effect>
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="36" Height="36" CornerRadius="12"
+                                    Background="#351C25" BorderBrush="#71414E" BorderThickness="1">
+                                <TextBlock Text="!" Foreground="#F3A1AA" FontSize="18" FontWeight="Bold"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="13,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="ConfirmTitleText" Text="确认操作"
+                                           FontFamily="{StaticResource DisplayFont}"
+                                           FontSize="18" FontWeight="SemiBold" />
+                                <TextBlock Text="此操作需要明确确认" Foreground="#7D879D"
+                                           FontSize="10.5" Margin="0,3,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock x:Name="ConfirmBodyText"
+                                   Margin="0,20,0,0"
+                                   Foreground="#C9CFDB"
+                                   FontSize="12"
+                                   LineHeight="19"
+                                   TextWrapping="Wrap" />
+
+                        <Border x:Name="ConfirmLocalContentPanel"
+                                Margin="0,18,0,0"
+                                Padding="14"
+                                Background="#18141C"
+                                BorderBrush="#4D303A"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <CheckBox x:Name="ConfirmDeleteLocalContentCheckBox"
+                                          Style="{StaticResource OptionCheckBox}"
+                                          Content="同时删除本地内容"
+                                          IsChecked="False" />
+                                <TextBlock x:Name="ConfirmLocalContentHintText"
+                                           Margin="28,8,0,0"
+                                           Foreground="#8E7881"
+                                           FontSize="10.5"
+                                           LineHeight="16"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Margin="0,24,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="ConfirmCancelButton"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Content="取消"
+                                    Click="ConfirmCancelButton_Click" />
+                            <Button x:Name="ConfirmAcceptButton"
+                                    Grid.Column="2"
+                                    Style="{StaticResource DangerButton}"
+                                    Content="确认"
+                                    Click="ConfirmAcceptButton_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </Window>

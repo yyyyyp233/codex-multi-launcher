@@ -62,6 +62,13 @@ public sealed record ProfileSetupRequest(
     string? ProfileId = null,
     ProfileAuthMode AuthMode = ProfileAuthMode.CustomResponses);
 
+public sealed record ProfileDeletionResult(
+    string ProfileId,
+    string DisplayName,
+    bool LocalContentDeleted,
+    string? RetainedDataRoot,
+    string? CleanupPendingPath = null);
+
 public sealed record CodexPackageInfo(
     string ExecutablePath,
     string InstallLocation,

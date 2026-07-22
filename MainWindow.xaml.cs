@@ -253,6 +253,10 @@ public partial class MainWindow : Window
             };
             window.ShowDialog();
             await RefreshStatusAsync(false);
+            if (window.ProfileDeleted && !string.IsNullOrWhiteSpace(window.ProfileDeletionMessage))
+            {
+                ShowToast(window.ProfileDeletionMessage, false);
+            }
         }
         catch (Exception exception)
         {

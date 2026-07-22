@@ -120,6 +120,17 @@ public sealed partial class CompanyProfileManager(
         return WithInitializationGate(() => ConfigureCore(request));
     }
 
+    public ProfileDeletionResult Delete(string profileId, bool deleteLocalContent)
+    {
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            throw new ArgumentException("必须指定要删除的 Profile ID。", nameof(profileId));
+        }
+
+        PreparePaths();
+        return WithInitializationGate(() => DeleteCore(profileId, deleteLocalContent));
+    }
+
     public static string ValidateAndNormalizeBaseUrl(string value)
     {
         if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri) ||
@@ -189,6 +200,196 @@ public sealed partial class CompanyProfileManager(
                 registry),
             _ => throw new ArgumentOutOfRangeException(nameof(request), "未知的隔离空间配置模式。")
         };
+    }
+
+    private ProfileDeletionResult DeleteCore(string profileId, bool deleteLocalContent)
+    {
+        var registry = ReadOrMigrateRegistry();
+        var registration = registry.Profiles.FirstOrDefault(profile =>
+            profile.ProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("指定的隔离空间不存在或已经被移除。");
+        var updatedRegistry = registry with
+        {
+            Profiles = registry.Profiles
+                .Where(profile => !profile.ProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase))
+                .ToArray()
+        };
+        var profileRoot = Path.GetFullPath(
+            Path.Combine(paths.ProfilesRoot, registration.ProfileDirectoryName));
+
+        if (!deleteLocalContent)
+        {
+            WriteRegistry(updatedRegistry);
+            return new ProfileDeletionResult(
+                registration.ProfileId,
+                registration.DisplayName,
+                false,
+                profileRoot);
+        }
+
+        var quarantineRoot = Path.Combine(
+            paths.OperationStagingRoot,
+            "profile-delete-" + Guid.NewGuid().ToString("N"));
+        var movedDirectories = new List<(string Source, string Quarantined)>();
+        Directory.CreateDirectory(quarantineRoot);
+        try
+        {
+            var ownedDirectories = EnumerateOwnedDirectories(registration).ToArray();
+            for (var index = 0; index < ownedDirectories.Length; index++)
+            {
+                MoveToQuarantine(
+                    ownedDirectories[index].Path,
+                    ownedDirectories[index].OwnerRoot,
+                    quarantineRoot,
+                    index,
+                    movedDirectories);
+            }
+
+            WriteRegistry(updatedRegistry);
+        }
+        catch (Exception operationException)
+        {
+            try
+            {
+                RestoreFromQuarantine(movedDirectories);
+                ProfileSnapshotService.SafeDeleteDirectory(quarantineRoot);
+            }
+            catch (Exception rollbackException)
+            {
+                throw new AggregateException(
+                    $"删除工作空间失败，且本地内容回滚不完整；隔离目录：{quarantineRoot}",
+                    operationException,
+                    rollbackException);
+            }
+
+            throw;
+        }
+
+        string? cleanupPendingPath = null;
+        try
+        {
+            ProfileSnapshotService.SafeDeleteDirectory(quarantineRoot);
+        }
+        catch
+        {
+            cleanupPendingPath = quarantineRoot;
+        }
+
+        return new ProfileDeletionResult(
+            registration.ProfileId,
+            registration.DisplayName,
+            true,
+            null,
+            cleanupPendingPath);
+    }
+
+    private IEnumerable<(string Path, string OwnerRoot)> EnumerateOwnedDirectories(
+        ManagedProfileRegistration registration)
+    {
+        yield return (
+            Path.Combine(paths.ProfilesRoot, registration.ProfileDirectoryName),
+            paths.ProfilesRoot);
+
+        var snapshotsRoot = Path.Combine(paths.RuntimeRoot, "snapshots");
+        yield return (
+            Path.Combine(snapshotsRoot, registration.ProfileDirectoryName),
+            snapshotsRoot);
+
+        var mergeBasesRoot = Path.Combine(paths.RuntimeRoot, "merge-bases");
+        yield return (
+            Path.Combine(mergeBasesRoot, registration.ProfileDirectoryName),
+            mergeBasesRoot);
+
+        var versionsRoot = Path.Combine(paths.RuntimeCacheRoot, "versions");
+        if (!Directory.Exists(versionsRoot))
+        {
+            yield break;
+        }
+
+        foreach (var candidate in Directory.EnumerateDirectories(versionsRoot))
+        {
+            var manifestPath = Path.Combine(candidate, "cache-manifest.json");
+            if (RuntimeCacheBelongsToProfile(manifestPath, registration.ProfileId))
+            {
+                yield return (candidate, versionsRoot);
+            }
+        }
+    }
+
+    private static bool RuntimeCacheBelongsToProfile(string manifestPath, string profileId)
+    {
+        if (!File.Exists(manifestPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            return document.RootElement.TryGetProperty("ProfileId", out var profileProperty) &&
+                   profileProperty.ValueKind == JsonValueKind.String &&
+                   string.Equals(
+                       profileProperty.GetString(),
+                       profileId,
+                       StringComparison.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+            // An unrelated or incomplete runtime cache is not owned by this profile.
+            return false;
+        }
+    }
+
+    private static void MoveToQuarantine(
+        string source,
+        string ownerRoot,
+        string quarantineRoot,
+        int index,
+        ICollection<(string Source, string Quarantined)> movedDirectories)
+    {
+        if (!Directory.Exists(source))
+        {
+            return;
+        }
+
+        var fullSource = Path.GetFullPath(source);
+        var fullOwnerRoot = Path.GetFullPath(ownerRoot);
+        if (!LauncherPaths.IsUnder(fullSource, fullOwnerRoot))
+        {
+            throw new InvalidOperationException("待删除的工作空间目录越过了允许边界。");
+        }
+
+        if ((File.GetAttributes(fullSource) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException("工作空间本地目录是链接或重解析点，已拒绝删除。");
+        }
+
+        var quarantined = Path.Combine(
+            quarantineRoot,
+            $"{index:D2}-{Path.GetFileName(fullSource)}");
+        Directory.Move(fullSource, quarantined);
+        movedDirectories.Add((fullSource, quarantined));
+    }
+
+    private static void RestoreFromQuarantine(
+        IReadOnlyList<(string Source, string Quarantined)> movedDirectories)
+    {
+        for (var index = movedDirectories.Count - 1; index >= 0; index--)
+        {
+            var item = movedDirectories[index];
+            if (!Directory.Exists(item.Quarantined))
+            {
+                continue;
+            }
+
+            if (Directory.Exists(item.Source))
+            {
+                throw new IOException($"无法回滚本地目录，目标已重新出现：{item.Source}");
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(item.Source)!);
+            Directory.Move(item.Quarantined, item.Source);
+        }
     }
 
     private ManagedProfileRegistration UpdateExisting(

@@ -285,61 +285,6 @@
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
                                   Focusable="False">
-                        <ScrollViewer.Resources>
-                            <Style TargetType="ScrollBar">
-                                <Setter Property="Width" Value="10" />
-                                <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ScrollBar">
-                                            <Grid Background="{TemplateBinding Background}" Margin="3,0,0,0">
-                                                <Track x:Name="PART_Track" IsDirectionReversed="True">
-                                                    <Track.DecreaseRepeatButton>
-                                                        <RepeatButton Focusable="False" Command="ScrollBar.PageUpCommand">
-                                                            <RepeatButton.Template>
-                                                                <ControlTemplate TargetType="RepeatButton">
-                                                                    <Border Background="Transparent" />
-                                                                </ControlTemplate>
-                                                            </RepeatButton.Template>
-                                                        </RepeatButton>
-                                                    </Track.DecreaseRepeatButton>
-                                                    <Track.IncreaseRepeatButton>
-                                                        <RepeatButton Focusable="False" Command="ScrollBar.PageDownCommand">
-                                                            <RepeatButton.Template>
-                                                                <ControlTemplate TargetType="RepeatButton">
-                                                                    <Border Background="Transparent" />
-                                                                </ControlTemplate>
-                                                            </RepeatButton.Template>
-                                                        </RepeatButton>
-                                                    </Track.IncreaseRepeatButton>
-                                                    <Track.Thumb>
-                                                        <Thumb>
-                                                            <Thumb.Template>
-                                                                <ControlTemplate TargetType="Thumb">
-                                                                    <Border x:Name="ThumbChrome"
-                                                                            CornerRadius="5"
-                                                                            Background="#333C51"
-                                                                            Margin="1,0" />
-                                                                    <ControlTemplate.Triggers>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter TargetName="ThumbChrome" Property="Background" Value="#4B5570" />
-                                                                        </Trigger>
-                                                                        <Trigger Property="IsDragging" Value="True">
-                                                                            <Setter TargetName="ThumbChrome" Property="Background" Value="#5A6580" />
-                                                                        </Trigger>
-                                                                    </ControlTemplate.Triggers>
-                                                                </ControlTemplate>
-                                                            </Thumb.Template>
-                                                        </Thumb>
-                                                    </Track.Thumb>
-                                                </Track>
-                                            </Grid>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ScrollViewer.Resources>
-
                         <ItemsControl x:Name="ProfileCards">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>

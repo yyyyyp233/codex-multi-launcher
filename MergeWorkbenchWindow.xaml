@@ -34,7 +34,8 @@
             <Setter Property="Padding" Value="14" />
         </Style>
 
-        <Style x:Key="DiffTextBox" TargetType="TextBox">
+        <Style x:Key="DiffTextBox" TargetType="TextBox" BasedOn="{StaticResource InputTextBox}">
+            <Setter Property="Height" Value="Auto" />
             <Setter Property="Background" Value="#101520" />
             <Setter Property="Foreground" Value="#DDE3EF" />
             <Setter Property="CaretBrush" Value="#C8BEFF" />
@@ -46,6 +47,7 @@
             <Setter Property="AcceptsReturn" Value="True" />
             <Setter Property="AcceptsTab" Value="True" />
             <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
             <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
         </Style>
@@ -366,7 +368,7 @@
                                    FontSize="9.5" Margin="0,3,0,0" />
                     </StackPanel>
                     <ComboBox x:Name="TargetBox" Grid.Column="1" Width="160" Height="36"
-                              Background="#151A26" Foreground="#E3E7F0" BorderBrush="#30384B"
+                              Style="{StaticResource InputComboBox}"
                               SelectionChanged="TargetBox_SelectionChanged">
                         <ComboBoxItem Content="写入工作空间" Tag="Company" IsSelected="True" />
                         <ComboBoxItem Content="写入个人" Tag="Personal" />

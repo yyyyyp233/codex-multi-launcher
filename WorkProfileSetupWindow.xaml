@@ -28,39 +28,6 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,0,0,7" />
         </Style>
-        <Style x:Key="InputTextBox" TargetType="TextBox">
-            <Setter Property="Height" Value="40" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="Foreground" Value="#F3F5FA" />
-            <Setter Property="Background" Value="#111722" />
-            <Setter Property="BorderBrush" Value="#30394C" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CaretBrush" Value="#C8BEFF" />
-            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
-        <Style x:Key="InputPasswordBox" TargetType="PasswordBox">
-            <Setter Property="Height" Value="40" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="Foreground" Value="#F3F5FA" />
-            <Setter Property="Background" Value="#111722" />
-            <Setter Property="BorderBrush" Value="#30394C" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CaretBrush" Value="#C8BEFF" />
-            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
-        <Style x:Key="InputComboBox" TargetType="ComboBox">
-            <Setter Property="Height" Value="40" />
-            <Setter Property="Padding" Value="9,5" />
-            <Setter Property="Foreground" Value="#F3F5FA" />
-            <Setter Property="Background" Value="#111722" />
-            <Setter Property="BorderBrush" Value="#30394C" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FontSize" Value="12" />
-        </Style>
         <Style x:Key="SectionCard" TargetType="Border">
             <Setter Property="CornerRadius" Value="13" />
             <Setter Property="Background" Value="#121624" />

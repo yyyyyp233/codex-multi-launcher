@@ -59,8 +59,8 @@ function New-LauncherMasterIcon {
         try {
             $tileBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
                 $tileRectangle,
-                [System.Drawing.ColorTranslator]::FromHtml('#D5CCFF'),
-                [System.Drawing.ColorTranslator]::FromHtml('#6651CD'),
+                [System.Drawing.ColorTranslator]::FromHtml('#23262B'),
+                [System.Drawing.ColorTranslator]::FromHtml('#090A0C'),
                 [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal)
             try {
                 $graphics.FillPath($tileBrush, $tilePath)
@@ -70,7 +70,7 @@ function New-LauncherMasterIcon {
             }
 
             $graphics.SetClip($tilePath)
-            $glowBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(52, 255, 255, 255))
+            $glowBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(74, 245, 138, 50))
             try {
                 $graphics.FillEllipse($glowBrush, -180, -260, 1040, 850)
             }
@@ -79,7 +79,7 @@ function New-LauncherMasterIcon {
                 $graphics.ResetClip()
             }
 
-            $borderPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(115, 235, 231, 255), 20)
+            $borderPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(220, 245, 138, 50), 20)
             try {
                 $borderPen.Alignment = [System.Drawing.Drawing2D.PenAlignment]::Inset
                 $graphics.DrawPath($borderPen, $tilePath)
@@ -95,8 +95,13 @@ function New-LauncherMasterIcon {
         $shadowPath = New-SparkPath 514 536 284 76
         $mainPath = New-SparkPath 512 516 284 76
         try {
-            $shadowBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(55, 19, 18, 34))
-            $mainBrush = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#121520'))
+            $shadowBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(115, 0, 0, 0))
+            $mainRectangle = [System.Drawing.RectangleF]::new(228, 232, 568, 568)
+            $mainBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
+                $mainRectangle,
+                [System.Drawing.ColorTranslator]::FromHtml('#FFA14F'),
+                [System.Drawing.ColorTranslator]::FromHtml('#D96A1B'),
+                [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal)
             try {
                 $graphics.FillPath($shadowBrush, $shadowPath)
                 $graphics.FillPath($mainBrush, $mainPath)
@@ -113,7 +118,7 @@ function New-LauncherMasterIcon {
 
         $smallSpark = New-SparkPath 750 278 74 20
         try {
-            $smallBrush = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#A6F0D8'))
+            $smallBrush = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#F4F4F2'))
             try {
                 $graphics.FillPath($smallBrush, $smallSpark)
             }
@@ -129,6 +134,42 @@ function New-LauncherMasterIcon {
     }
     finally {
         $graphics.Dispose()
+    }
+}
+
+function Assert-BlackOrangeIcon {
+    param([System.Drawing.Bitmap]$Bitmap)
+
+    $orangePixels = 0
+    $purplePixels = 0
+    for ($y = 0; $y -lt $Bitmap.Height; $y += 4) {
+        for ($x = 0; $x -lt $Bitmap.Width; $x += 4) {
+            $pixel = $Bitmap.GetPixel($x, $y)
+            if ($pixel.A -lt 32) {
+                continue
+            }
+
+            $hue = $pixel.GetHue()
+            $saturation = $pixel.GetSaturation()
+            $brightness = $pixel.GetBrightness()
+            if ($hue -ge 250 -and $hue -le 330 -and
+                $saturation -ge 0.20 -and $brightness -ge 0.16) {
+                $purplePixels++
+            }
+
+            if ($hue -ge 10 -and $hue -le 55 -and
+                $saturation -ge 0.45 -and $brightness -ge 0.25) {
+                $orangePixels++
+            }
+        }
+    }
+
+    if ($purplePixels -gt 0) {
+        throw "Generated icon contains $purplePixels purple-spectrum sample pixels."
+    }
+
+    if ($orangePixels -lt 3000) {
+        throw "Generated icon does not contain enough orange pixels."
     }
 }
 
@@ -209,6 +250,7 @@ New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
 
 $master = New-LauncherMasterIcon
 try {
+    Assert-BlackOrangeIcon $master
     $iconPath = Join-Path $assetDirectory 'CodexChannelLauncher.ico'
     Write-MultiSizeIcon $master $iconPath
     $master.Save((Join-Path $artifactDirectory 'icon-preview.png'), [System.Drawing.Imaging.ImageFormat]::Png)

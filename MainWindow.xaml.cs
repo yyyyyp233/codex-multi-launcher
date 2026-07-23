@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -66,9 +67,11 @@ public partial class MainWindow : Window
     private readonly ProfileCoordinator coordinator;
     private readonly string? previewOutput;
     private readonly DispatcherTimer statusTimer;
+    private readonly TrayIconController? trayIcon;
     private CancellationTokenSource? toastCancellation;
     private TaskCompletionSource<bool>? dialogCompletion;
     private bool isBusy;
+    private bool exitRequested;
     private string? busyIdentity;
 
     public MainWindow(ProfileCoordinator coordinator, string? previewOutput = null)
@@ -81,12 +84,15 @@ public partial class MainWindow : Window
         statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         statusTimer.Tick += async (_, _) => await RefreshStatusAsync(false);
         Loaded += MainWindow_Loaded;
-        Closed += (_, _) =>
+        Closing += MainWindow_Closing;
+        Closed += MainWindow_Closed;
+        if (this.previewOutput is null)
         {
-            statusTimer.Stop();
-            toastCancellation?.Cancel();
-            coordinator.ProgressChanged -= Coordinator_ProgressChanged;
-        };
+            trayIcon = new TrayIconController(
+                () => Dispatcher.BeginInvoke(ShowFromTray),
+                () => Dispatcher.BeginInvoke(ExitFromTray));
+            Application.Current.SessionEnding += Application_SessionEnding;
+        }
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -175,6 +181,68 @@ public partial class MainWindow : Window
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        if (exitRequested || previewOutput is not null)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        Hide();
+        statusTimer.Stop();
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        statusTimer.Stop();
+        toastCancellation?.Cancel();
+        coordinator.ProgressChanged -= Coordinator_ProgressChanged;
+        if (previewOutput is null)
+        {
+            Application.Current.SessionEnding -= Application_SessionEnding;
+        }
+
+        trayIcon?.Dispose();
+    }
+
+    private void ShowFromTray()
+    {
+        if (exitRequested)
+        {
+            return;
+        }
+
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+        statusTimer.Start();
+        _ = RefreshStatusAsync(false);
+    }
+
+    private void ExitFromTray()
+    {
+        if (exitRequested)
+        {
+            return;
+        }
+
+        exitRequested = true;
+        trayIcon?.Dispose();
+        Close();
+        Application.Current.Shutdown();
+    }
+
+    private void Application_SessionEnding(object? sender, SessionEndingCancelEventArgs e)
+    {
+        exitRequested = true;
+        trayIcon?.Dispose();
+    }
 
     private async void ProfileLaunchButton_Click(object sender, RoutedEventArgs e)
     {

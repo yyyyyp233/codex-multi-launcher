@@ -43,6 +43,7 @@ public sealed class LauncherPaths
         ProfilesRoot = Path.Combine(RuntimeRoot, "profiles");
         OperationStagingRoot = Path.Combine(RuntimeRoot, "staging");
         StateDirectory = Path.Combine(RuntimeRoot, "state");
+        OperationLockFile = Path.Combine(StateDirectory, "profile-operation.lock");
         StateFile = Path.Combine(StateDirectory, "launcher-state.json");
         WorkProfileRegistrationFile = Path.Combine(StateDirectory, "work-profile.json");
         ProfilesRegistryFile = Path.Combine(StateDirectory, "profiles.json");
@@ -62,6 +63,8 @@ public sealed class LauncherPaths
     public string OperationStagingRoot { get; }
 
     public string StateDirectory { get; }
+
+    public string OperationLockFile { get; }
 
     public string StateFile { get; }
 
@@ -170,6 +173,34 @@ public sealed class LauncherPaths
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
         return candidateFull.StartsWith(parentFull, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static void EnsureNoReparsePoints(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(fullPath);
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            throw new InvalidDataException($"无法解析路径根目录：{fullPath}");
+        }
+
+        var current = root;
+        var relative = fullPath[root.Length..];
+        foreach (var segment in relative.Split(
+                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            if (!Directory.Exists(current) && !File.Exists(current))
+            {
+                break;
+            }
+
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidDataException($"路径包含不受支持的重解析点：{current}");
+            }
+        }
     }
 
     public static bool IsSafeProfileDirectoryName(string? value)

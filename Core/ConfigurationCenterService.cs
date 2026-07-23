@@ -176,8 +176,6 @@ public sealed class ConfigurationCenterService(
     ProfileSnapshotService snapshots,
     CodexPackageLocator packageLocator)
 {
-    private const string OperationGateName = @"Local\CodexChannelLauncher.ConfigurationOperation";
-
     public string CompanyConfigPath => paths.CompanyConfig;
 
     public string CompanyHome => paths.CompanyCodexHome;
@@ -186,7 +184,8 @@ public sealed class ConfigurationCenterService(
 
     public bool IsCompanyRunning()
     {
-        var registration = profileManager.GetProfiles().FirstOrDefault(profile =>
+        var profiles = profileManager.GetProfiles();
+        var registration = profiles.FirstOrDefault(profile =>
             profile.ProfileDirectoryName.Equals(
                 paths.WorkProfileDirectoryName,
                 StringComparison.OrdinalIgnoreCase));
@@ -196,13 +195,18 @@ public sealed class ConfigurationCenterService(
         }
 
         var state = new StateStore(paths).Load();
-        return state.ProfileRootProcesses is not null &&
-               state.ProfileRootProcesses.TryGetValue(registration.ProfileId, out var marker) &&
-               ProcessInventory.IsAlive(marker);
+        state.ProfileRootProcesses ??=
+            new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
+        state.ProfileRootProcesses.TryGetValue(registration.ProfileId, out var marker);
+        return ProcessInventory.IsProfileMutationBlocked(
+            paths,
+            registration.ProfileId,
+            marker,
+            profiles.Select(profile => profile.ProfileId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
     }
 
-    public bool IsPersonalRunning() => ProcessInventory.GetChatGptRoots()
-        .Any(process => !LauncherPaths.IsUnder(process.ExecutablePath, paths.RuntimeCacheRoot));
+    public bool IsPersonalRunning() => ProcessInventory.IsPersonalRunning(paths);
 
     public ConfigurationCenterOverview GetOverview()
     {
@@ -444,8 +448,9 @@ public sealed class ConfigurationCenterService(
                 EnsureCompanyStopped();
             }
 
+            var safetySnapshot = snapshots.Restore(archivePath);
             InvalidateMergeBases();
-            return snapshots.Restore(archivePath);
+            return safetySnapshot;
         });
     }
 
@@ -719,33 +724,8 @@ public sealed class ConfigurationCenterService(
 
     private T WithOperationGate<T>(Func<T> action)
     {
-        using var mutex = new Mutex(false, OperationGateName);
-        var lockTaken = false;
-        try
-        {
-            try
-            {
-                lockTaken = mutex.WaitOne(TimeSpan.FromSeconds(45));
-            }
-            catch (AbandonedMutexException)
-            {
-                lockTaken = true;
-            }
-
-            if (!lockTaken)
-            {
-                throw new TimeoutException("另一个多开器窗口正在修改配置或双向数据。");
-            }
-
-            return action();
-        }
-        finally
-        {
-            if (lockTaken)
-            {
-                mutex.ReleaseMutex();
-            }
-        }
+        using var operationGate = LauncherOperationGate.Acquire(paths);
+        return action();
     }
 
     private void EnsureProfileReady()
@@ -978,6 +958,7 @@ public sealed class ConfigurationCenterService(
             throw new InvalidOperationException("资源路径越界。");
         }
 
+        LauncherPaths.EnsureNoReparsePoints(path);
         return path;
     }
 
@@ -997,10 +978,7 @@ public sealed class ConfigurationCenterService(
             throw new InvalidOperationException("全局规则路径越界。");
         }
 
-        if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidOperationException("全局规则文件是链接或重解析点，已拒绝访问。");
-        }
+        LauncherPaths.EnsureNoReparsePoints(path);
 
         return path;
     }

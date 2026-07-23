@@ -15,7 +15,8 @@ public sealed record WorkProfileMarker(
     bool ImportedSkills,
     bool ImportedMemories,
     ProfileAuthMode AuthMode = ProfileAuthMode.CustomResponses,
-    string AccentColor = "#7C3AED");
+    string AccentColor = "#7C3AED",
+    string? ProfileId = null);
 
 public sealed partial class CompanyProfileManager(
     LauncherPaths paths,
@@ -32,16 +33,18 @@ public sealed partial class CompanyProfileManager(
         string DisplayName,
         string CodexHome,
         ProfileAuthMode AuthMode,
-        string AccentColor);
+        string AccentColor,
+        string? ProfileId);
 
     private sealed record ExistingProfileBinding(
         string ProfileDirectoryName,
         string CodexHome,
-        string? AccentColor);
+        string? AccentColor,
+        string? ProfileId);
 
     private const int LegacyRegistrationSchemaVersion = 1;
     private const int RegistrySchemaVersion = 1;
-    private const int MarkerSchemaVersion = 4;
+    private const int MarkerSchemaVersion = 5;
     private const string InitializationGateName = @"Local\CodexChannelLauncher.WorkProfileInitialization";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -220,6 +223,9 @@ public sealed partial class CompanyProfileManager(
 
         if (!deleteLocalContent)
         {
+            EnsureMarkerProfileId(
+                Path.Combine(profileRoot, "codex-home", "launcher-profile-v2.json"),
+                registration.ProfileId);
             WriteRegistry(updatedRegistry);
             return new ProfileDeletionResult(
                 registration.ProfileId,
@@ -232,7 +238,9 @@ public sealed partial class CompanyProfileManager(
             paths.OperationStagingRoot,
             "profile-delete-" + Guid.NewGuid().ToString("N"));
         var movedDirectories = new List<(string Source, string Quarantined)>();
+        LauncherPaths.EnsureNoReparsePoints(paths.OperationStagingRoot);
         Directory.CreateDirectory(quarantineRoot);
+        LauncherPaths.EnsureNoReparsePoints(quarantineRoot);
         try
         {
             var ownedDirectories = EnumerateOwnedDirectories(registration).ToArray();
@@ -307,9 +315,17 @@ public sealed partial class CompanyProfileManager(
             yield break;
         }
 
+        LauncherPaths.EnsureNoReparsePoints(versionsRoot);
         foreach (var candidate in Directory.EnumerateDirectories(versionsRoot))
         {
+            if ((File.GetAttributes(candidate) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidDataException(
+                    $"运行副本目录包含链接或重解析点，已拒绝删除：{candidate}");
+            }
+
             var manifestPath = Path.Combine(candidate, "cache-manifest.json");
+            LauncherPaths.EnsureNoReparsePoints(manifestPath);
             if (RuntimeCacheBelongsToProfile(manifestPath, registration.ProfileId))
             {
                 yield return (candidate, versionsRoot);
@@ -360,14 +376,18 @@ public sealed partial class CompanyProfileManager(
             throw new InvalidOperationException("待删除的工作空间目录越过了允许边界。");
         }
 
-        if ((File.GetAttributes(fullSource) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidOperationException("工作空间本地目录是链接或重解析点，已拒绝删除。");
-        }
+        LauncherPaths.EnsureNoReparsePoints(fullOwnerRoot);
+        LauncherPaths.EnsureNoReparsePoints(fullSource);
+        LauncherPaths.EnsureNoReparsePoints(quarantineRoot);
 
         var quarantined = Path.Combine(
             quarantineRoot,
             $"{index:D2}-{Path.GetFileName(fullSource)}");
+        if (!LauncherPaths.IsUnder(quarantined, quarantineRoot))
+        {
+            throw new InvalidOperationException("删除隔离目录越过了允许边界。");
+        }
+
         Directory.Move(fullSource, quarantined);
         movedDirectories.Add((fullSource, quarantined));
     }
@@ -427,19 +447,6 @@ public sealed partial class CompanyProfileManager(
             ? ProfileConfigDocument.Load(paths.CompanyConfig)
             : ProfileConfigDocument.Create();
         ApplyProfileSettings(document, request.AuthMode, settings);
-        document.SaveAtomic(paths.CompanyConfig);
-
-        if (request.AuthMode == ProfileAuthMode.ChatGptAccount)
-        {
-            if (authModeChanged && File.Exists(paths.CompanyAuth))
-            {
-                File.Delete(paths.CompanyAuth);
-            }
-        }
-        else if (!string.IsNullOrWhiteSpace(request.ApiKey))
-        {
-            WriteApiKeyAtomic(paths.CompanyAuth, ValidateApiKey(request.ApiKey));
-        }
 
         var updated = registration with
         {
@@ -447,22 +454,65 @@ public sealed partial class CompanyProfileManager(
             AuthMode = request.AuthMode,
             UpdatedAtUtc = DateTime.UtcNow
         };
-        WriteMarker(
-            paths.CompanyProfileMarker,
-            displayName,
-            "updated",
-            false,
-            false,
-            updated.AuthMode,
-            updated.AccentColor);
-        WriteRegistry(registry with
+        var updatedRegistry = registry with
         {
             Profiles = registry.Profiles
                 .Select(profile => profile.ProfileId.Equals(updated.ProfileId, StringComparison.OrdinalIgnoreCase)
                     ? updated
                     : profile)
                 .ToArray()
-        });
+        };
+
+        var stagingRoot = Path.Combine(
+            paths.OperationStagingRoot,
+            "profile-update-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(stagingRoot);
+        try
+        {
+            var stagedConfig = Path.Combine(stagingRoot, "config.toml");
+            var stagedAuth = Path.Combine(stagingRoot, "auth.json");
+            var stagedMarker = Path.Combine(stagingRoot, "launcher-profile-v2.json");
+            var stagedRegistry = Path.Combine(stagingRoot, "profiles.json");
+            document.SaveAtomic(stagedConfig);
+            WriteMarker(
+                stagedMarker,
+                displayName,
+                "updated",
+                false,
+                false,
+                updated.AuthMode,
+                updated.AccentColor,
+                updated.ProfileId);
+            WriteAtomic(
+                stagedRegistry,
+                JsonSerializer.Serialize(ValidateRegistry(updatedRegistry), JsonOptions));
+
+            var changes = new List<AtomicFileChange>
+            {
+                new(paths.CompanyConfig, stagedConfig)
+            };
+            if (request.AuthMode == ProfileAuthMode.ChatGptAccount)
+            {
+                if (authModeChanged && File.Exists(paths.CompanyAuth))
+                {
+                    changes.Add(new AtomicFileChange(paths.CompanyAuth, null));
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(request.ApiKey))
+            {
+                WriteApiKeyAtomic(stagedAuth, ValidateApiKey(request.ApiKey));
+                changes.Add(new AtomicFileChange(paths.CompanyAuth, stagedAuth));
+            }
+
+            changes.Add(new AtomicFileChange(paths.CompanyProfileMarker, stagedMarker));
+            changes.Add(new AtomicFileChange(paths.ProfilesRegistryFile, stagedRegistry));
+            AtomicFileTransaction.Commit(paths, changes);
+        }
+        finally
+        {
+            ProfileSnapshotService.SafeDeleteDirectory(stagingRoot);
+        }
+
         return updated;
     }
 
@@ -492,12 +542,22 @@ public sealed partial class CompanyProfileManager(
             binding.ProfileDirectoryName,
             displayName,
             authMode,
-            accentColor);
+            accentColor,
+            binding.ProfileId);
+        if (registry.Profiles.Any(profile =>
+                profile.ProfileId.Equals(registration.ProfileId, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidDataException("所选工作空间的 Profile ID 已被其他注册项占用。");
+        }
+
         _ = ReadMetadataCore(
             Path.Combine(binding.CodexHome, "config.toml"),
             Path.Combine(binding.CodexHome, "auth.json"),
             registration);
 
+        EnsureMarkerProfileId(
+            Path.Combine(binding.CodexHome, "launcher-profile-v2.json"),
+            registration.ProfileId);
         WriteRegistry(registry with { Profiles = [.. registry.Profiles, registration] });
         paths.SelectWorkProfileDirectory(binding.ProfileDirectoryName);
         return registration;
@@ -547,7 +607,8 @@ public sealed partial class CompanyProfileManager(
                 false,
                 false,
                 authMode,
-                accentColor);
+                accentColor,
+                registration.ProfileId);
 
             if (Directory.Exists(targetRoot))
             {
@@ -673,12 +734,24 @@ public sealed partial class CompanyProfileManager(
                 candidate.ProfileDirectoryName,
                 displayName,
                 candidate.AuthMode,
-                AllocateAccentColor(registrations)));
+                AllocateAccentColor(registrations),
+                candidate.ProfileId));
         }
 
         var registry = new ManagedProfileRegistry(RegistrySchemaVersion, registrations);
         if (registrations.Count > 0 || legacyRegistration is not null)
         {
+            foreach (var registration in registrations)
+            {
+                EnsureMarkerProfileId(
+                    Path.Combine(
+                        paths.ProfilesRoot,
+                        registration.ProfileDirectoryName,
+                        "codex-home",
+                        "launcher-profile-v2.json"),
+                    registration.ProfileId);
+            }
+
             WriteRegistry(registry);
             if (legacyRegistration is not null)
             {
@@ -695,6 +768,11 @@ public sealed partial class CompanyProfileManager(
                            File.ReadAllText(paths.ProfilesRegistryFile),
                            JsonOptions)
                        ?? throw new InvalidDataException("隔离空间注册表不可解析。");
+        return ValidateRegistry(registry);
+    }
+
+    private static ManagedProfileRegistry ValidateRegistry(ManagedProfileRegistry registry)
+    {
         if (registry.SchemaVersion != RegistrySchemaVersion || registry.Profiles is null)
         {
             throw new InvalidDataException("隔离空间注册表版本无效。");
@@ -733,8 +811,11 @@ public sealed partial class CompanyProfileManager(
         return registration;
     }
 
-    private void WriteRegistry(ManagedProfileRegistry registry) =>
-        WriteAtomic(paths.ProfilesRegistryFile, JsonSerializer.Serialize(registry, JsonOptions));
+    private void WriteRegistry(ManagedProfileRegistry registry)
+    {
+        var validated = ValidateRegistry(registry);
+        WriteAtomic(paths.ProfilesRegistryFile, JsonSerializer.Serialize(validated, JsonOptions));
+    }
 
     private IReadOnlyList<LegacyProfileCandidate> DiscoverCandidates()
     {
@@ -743,6 +824,7 @@ public sealed partial class CompanyProfileManager(
             return [];
         }
 
+        LauncherPaths.EnsureNoReparsePoints(paths.ProfilesRoot);
         var result = new List<LegacyProfileCandidate>();
         foreach (var directory in Directory.EnumerateDirectories(paths.ProfilesRoot)
                      .OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
@@ -759,7 +841,13 @@ public sealed partial class CompanyProfileManager(
 
                 var home = Path.Combine(directory, "codex-home");
                 var marker = Path.Combine(home, "launcher-profile-v2.json");
-                if (!TryReadMarker(marker, out var markerDisplayName, out var markerColor))
+                LauncherPaths.EnsureNoReparsePoints(home);
+                LauncherPaths.EnsureNoReparsePoints(marker);
+                if (!TryReadMarker(
+                        marker,
+                        out var markerDisplayName,
+                        out var markerColor,
+                        out var markerProfileId))
                 {
                     continue;
                 }
@@ -767,16 +855,35 @@ public sealed partial class CompanyProfileManager(
                 var displayName = string.IsNullOrWhiteSpace(markerDisplayName)
                     ? directoryName
                     : ValidateDisplayName(markerDisplayName);
+                var configPath = Path.Combine(home, "config.toml");
+                var authPath = Path.Combine(home, "auth.json");
+                LauncherPaths.EnsureNoReparsePoints(configPath);
+                if (File.Exists(authPath))
+                {
+                    LauncherPaths.EnsureNoReparsePoints(authPath);
+                }
+
                 var authMode = InferAuthMode(
-                    Path.Combine(home, "config.toml"),
-                    Path.Combine(home, "auth.json"));
+                    configPath,
+                    authPath);
                 var color = IsValidAccentColor(markerColor) ? markerColor! : "#7C3AED";
-                var temporary = NewRegistration(directoryName, displayName, authMode, color);
+                var temporary = NewRegistration(
+                    directoryName,
+                    displayName,
+                    authMode,
+                    color,
+                    markerProfileId);
                 _ = ReadMetadataCore(
-                    Path.Combine(home, "config.toml"),
-                    Path.Combine(home, "auth.json"),
+                    configPath,
+                    authPath,
                     temporary);
-                result.Add(new LegacyProfileCandidate(directoryName, displayName, home, authMode, color));
+                result.Add(new LegacyProfileCandidate(
+                    directoryName,
+                    displayName,
+                    home,
+                    authMode,
+                    color,
+                    markerProfileId));
             }
             catch
             {
@@ -790,11 +897,18 @@ public sealed partial class CompanyProfileManager(
     private void ValidateRegisteredProfile(ManagedProfileRegistration registration)
     {
         ValidateRegistration(registration);
-        if (!TryReadMarker(paths.CompanyProfileMarker, out _, out _))
+        if (!TryReadMarker(paths.CompanyProfileMarker, out _, out _, out var markerProfileId))
         {
             throw new InvalidDataException("隔离空间标记缺失或不可解析。");
         }
 
+        if (markerProfileId is not null &&
+            !markerProfileId.Equals(registration.ProfileId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("隔离空间标记与注册表的 Profile ID 不一致。");
+        }
+
+        EnsureMarkerProfileId(paths.CompanyProfileMarker, registration.ProfileId);
         _ = ReadMetadataCore(paths.CompanyConfig, paths.CompanyAuth, registration);
     }
 
@@ -1011,10 +1125,7 @@ public sealed partial class CompanyProfileManager(
             throw new DirectoryNotFoundException("所选工作空间目录不存在。");
         }
 
-        if ((File.GetAttributes(selected) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidOperationException("不能接入链接或重解析点目录。");
-        }
+        LauncherPaths.EnsureNoReparsePoints(selected);
 
         var directConfig = Path.Combine(selected, "config.toml");
         var nestedHome = Path.Combine(selected, "codex-home");
@@ -1034,41 +1145,36 @@ public sealed partial class CompanyProfileManager(
                 "只能原地接入多开器本地 profiles 目录下保留的工作空间；个人或外部 Codex Home 不会被绑定。");
         }
 
-        if ((File.GetAttributes(profileRoot.FullName) & FileAttributes.ReparsePoint) != 0 ||
-            (File.GetAttributes(codexHome) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidOperationException("工作空间根目录或 Codex Home 是链接，已拒绝接入。");
-        }
+        LauncherPaths.EnsureNoReparsePoints(profileRoot.FullName);
+        LauncherPaths.EnsureNoReparsePoints(codexHome);
 
         var configPath = Path.Combine(codexHome, "config.toml");
-        if ((File.GetAttributes(configPath) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidDataException("工作空间 config.toml 不能是链接或重解析点。");
-        }
+        LauncherPaths.EnsureNoReparsePoints(configPath);
 
         var authPath = Path.Combine(codexHome, "auth.json");
-        if (File.Exists(authPath) &&
-            (File.GetAttributes(authPath) & FileAttributes.ReparsePoint) != 0)
+        if (File.Exists(authPath))
         {
-            throw new InvalidDataException("工作空间 auth.json 不能是链接或重解析点。");
+            LauncherPaths.EnsureNoReparsePoints(authPath);
         }
 
         var markerPath = Path.Combine(codexHome, "launcher-profile-v2.json");
-        if ((File.Exists(markerPath) &&
-             (File.GetAttributes(markerPath) & FileAttributes.ReparsePoint) != 0) ||
-            !TryReadMarker(markerPath, out _, out var markerColor))
+        LauncherPaths.EnsureNoReparsePoints(markerPath);
+        if (!TryReadMarker(markerPath, out _, out var markerColor, out var markerProfileId))
         {
             throw new InvalidDataException("所选目录缺少有效的多开器工作空间标记，无法安全接入。");
         }
 
         var electronData = Path.Combine(profileRoot.FullName, "electron");
-        if (Directory.Exists(electronData) &&
-            (File.GetAttributes(electronData) & FileAttributes.ReparsePoint) != 0)
+        if (Directory.Exists(electronData))
         {
-            throw new InvalidOperationException("工作空间 Electron 数据目录是链接，已拒绝接入。");
+            LauncherPaths.EnsureNoReparsePoints(electronData);
         }
 
-        return new ExistingProfileBinding(profileRoot.Name, codexHome, markerColor);
+        return new ExistingProfileBinding(
+            profileRoot.Name,
+            codexHome,
+            markerColor,
+            markerProfileId);
     }
 
     private string AllocateProfileDirectoryName(IEnumerable<ManagedProfileRegistration> profiles)
@@ -1095,12 +1201,13 @@ public sealed partial class CompanyProfileManager(
         string directoryName,
         string displayName,
         ProfileAuthMode authMode,
-        string accentColor)
+        string accentColor,
+        string? profileId = null)
     {
         var now = DateTime.UtcNow;
         return new ManagedProfileRegistration(
             RegistrySchemaVersion,
-            Guid.NewGuid().ToString("N"),
+            profileId ?? Guid.NewGuid().ToString("N"),
             directoryName,
             ValidateDisplayName(displayName),
             authMode,
@@ -1162,7 +1269,8 @@ public sealed partial class CompanyProfileManager(
         bool importedSkills,
         bool importedMemories,
         ProfileAuthMode authMode,
-        string accentColor)
+        string accentColor,
+        string profileId)
     {
         var marker = new WorkProfileMarker(
             MarkerSchemaVersion,
@@ -1173,17 +1281,20 @@ public sealed partial class CompanyProfileManager(
             importedSkills,
             importedMemories,
             authMode,
-            accentColor);
+            accentColor,
+            profileId);
         WriteAtomic(destination, JsonSerializer.Serialize(marker, JsonOptions));
     }
 
     private static bool TryReadMarker(
         string markerPath,
         out string? displayName,
-        out string? accentColor)
+        out string? accentColor,
+        out string? profileId)
     {
         displayName = null;
         accentColor = null;
+        profileId = null;
         if (!File.Exists(markerPath))
         {
             return false;
@@ -1224,12 +1335,68 @@ public sealed partial class CompanyProfileManager(
                 accentColor = colorProperty.GetString();
             }
 
+            if (TryGetProperty(document.RootElement, "ProfileId", out var profileIdProperty) &&
+                profileIdProperty.ValueKind == JsonValueKind.String)
+            {
+                profileId = profileIdProperty.GetString();
+                if (!LauncherPaths.IsSafeProfileDirectoryName(profileId))
+                {
+                    return false;
+                }
+            }
+
+            if (schema >= MarkerSchemaVersion && profileId is null)
+            {
+                return false;
+            }
+
             return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static void EnsureMarkerProfileId(string markerPath, string profileId)
+    {
+        if (!LauncherPaths.IsSafeProfileDirectoryName(profileId))
+        {
+            throw new InvalidDataException("Profile ID 无效，无法写入空间标记。");
+        }
+
+        LauncherPaths.EnsureNoReparsePoints(markerPath);
+        if (!TryReadMarker(markerPath, out _, out _, out var existingProfileId))
+        {
+            throw new InvalidDataException("隔离空间标记缺失或不可解析。");
+        }
+
+        if (existingProfileId is not null &&
+            !existingProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("隔离空间标记已绑定不同的 Profile ID。");
+        }
+
+        var marker = JsonSerializer.Deserialize<WorkProfileMarker>(
+                         File.ReadAllText(markerPath),
+                         JsonOptions)
+                     ?? throw new InvalidDataException("隔离空间标记不可解析。");
+
+        if (marker.SchemaVersion == MarkerSchemaVersion &&
+            marker.ProfileId?.Equals(profileId, StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return;
+        }
+
+        WriteAtomic(
+            markerPath,
+            JsonSerializer.Serialize(
+                marker with
+                {
+                    SchemaVersion = MarkerSchemaVersion,
+                    ProfileId = profileId
+                },
+                JsonOptions));
     }
 
     private static bool TryGetProperty(

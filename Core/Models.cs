@@ -87,6 +87,11 @@ public sealed record ChatGptProcessSnapshot(
     DateTime StartedAtUtc,
     string ExecutablePath);
 
+public sealed record ChatGptProcessOwnership(
+    ChatGptProcessSnapshot Process,
+    bool IsRuntimeCache,
+    string? ProfileId);
+
 public sealed class LauncherState
 {
     public Dictionary<string, ProcessMarker> ProfileRootProcesses { get; set; } =
@@ -127,7 +132,8 @@ public sealed record RuntimeStatus(
     int PersonalRootProcessCount,
     CodexPackageInfo? Package,
     IReadOnlyList<ManagedProfileRuntimeStatus> ManagedProfiles,
-    string? Problem);
+    string? Problem,
+    bool UnresolvedManagedProcessRunning = false);
 
 public sealed record LaunchOutcome(
     bool Started,

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace CodexChannelLauncher.Core;
 
@@ -72,6 +73,49 @@ public static class ProcessInventory
         }
     }
 
+    public static IReadOnlyList<ChatGptProcessOwnership> ClassifyChatGptRoots(
+        LauncherPaths paths,
+        IReadOnlyList<ChatGptProcessSnapshot>? roots = null)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        roots ??= GetChatGptRoots();
+        return roots.Select(process =>
+        {
+            var isRuntimeCache = LauncherPaths.IsUnder(
+                process.ExecutablePath,
+                paths.RuntimeCacheRoot);
+            return new ChatGptProcessOwnership(
+                process,
+                isRuntimeCache,
+                isRuntimeCache ? TryReadRuntimeCacheProfileId(paths, process.ExecutablePath) : null);
+        }).ToArray();
+    }
+
+    public static bool IsProfileMutationBlocked(
+        LauncherPaths paths,
+        string profileId,
+        ProcessMarker? stateMarker = null,
+        IReadOnlySet<string>? registeredProfileIds = null)
+    {
+        var ownership = ClassifyChatGptRoots(paths);
+        if (stateMarker is not null &&
+            ownership.Any(item => item.Process.ProcessId == stateMarker.ProcessId &&
+                                  IsSameProcess(item.Process, stateMarker)))
+        {
+            return true;
+        }
+
+        return ownership.Any(item =>
+            item.IsRuntimeCache &&
+            (string.IsNullOrWhiteSpace(item.ProfileId) ||
+             item.ProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase) ||
+             registeredProfileIds is not null &&
+             !registeredProfileIds.Contains(item.ProfileId)));
+    }
+
+    public static bool IsPersonalRunning(LauncherPaths paths) =>
+        ClassifyChatGptRoots(paths).Any(item => !item.IsRuntimeCache);
+
     private static IEnumerable<Process> GetDesktopProcesses()
     {
         foreach (var process in Process.GetProcessesByName("ChatGPT"))
@@ -101,6 +145,58 @@ public static class ProcessInventory
         return file.Equals("Codex.exe", StringComparison.OrdinalIgnoreCase) &&
                Path.GetFileName(Path.GetDirectoryName(path))?.Equals("app", StringComparison.OrdinalIgnoreCase) == true;
     }
+
+    private static bool IsSameProcess(ChatGptProcessSnapshot process, ProcessMarker marker) =>
+        process.ProcessId == marker.ProcessId &&
+        (process.StartedAtUtc - marker.StartedAtUtc).Duration() < TimeSpan.FromSeconds(2);
+
+    internal static string? TryReadRuntimeCacheProfileId(
+        LauncherPaths paths,
+        string executablePath)
+    {
+        try
+        {
+            var executable = Path.GetFullPath(executablePath);
+            var appDirectory = Path.GetDirectoryName(executable);
+            var cacheDirectory = appDirectory is null ? null : Path.GetDirectoryName(appDirectory);
+            var versionsRoot = Path.Combine(paths.RuntimeCacheRoot, "versions");
+            if (appDirectory is null ||
+                cacheDirectory is null ||
+                !Path.GetFileName(appDirectory).Equals("app", StringComparison.OrdinalIgnoreCase) ||
+                !LauncherPaths.IsUnder(cacheDirectory, versionsRoot))
+            {
+                return null;
+            }
+
+            LauncherPaths.EnsureNoReparsePoints(cacheDirectory);
+            var manifestPath = Path.Combine(cacheDirectory, "cache-manifest.json");
+            LauncherPaths.EnsureNoReparsePoints(manifestPath);
+            if (!File.Exists(manifestPath))
+            {
+                return null;
+            }
+
+            using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            if (!document.RootElement.TryGetProperty("ProfileId", out var profileProperty) ||
+                profileProperty.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            var profileId = profileProperty.GetString();
+            return IsSafeProfileId(profileId) ? profileId : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool IsSafeProfileId(string? profileId) =>
+        !string.IsNullOrWhiteSpace(profileId) &&
+        profileId.Length <= 64 &&
+        profileId.All(character =>
+            char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
 
     public static bool TryFocus(ProcessMarker? marker)
     {

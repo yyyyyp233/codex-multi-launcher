@@ -86,13 +86,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\audit-repository
 - `%LOCALAPPDATA%\CodexChannelLauncher\profiles\<目录名>` 工作空间目录；
 - 或其下的 `codex-home` 目录。
 
-所选目录必须带有有效的多开器 marker。接入只向 `profiles.json` 增加注册，不移动、不复制、不重写原工作空间；任务会话、SQLite、插件、Skills、Memories 和同级 Electron 数据都继续使用原位置。
+所选目录必须带有有效的多开器 marker。接入不移动、不复制工作空间，只向 `profiles.json` 增加注册；旧 marker 会原子升级并持久化稳定的 `ProfileId`，以便保留后再次接入时继续复用并可清理原专属运行副本。`config.toml`、`auth.json`、任务会话、SQLite、插件、Skills、Memories 和同级 Electron 数据都保持原位置与内容。
 
 个人 `%USERPROFILE%\.codex` 和 `profiles` 根目录之外的任意 Codex Home 会被拒绝绑定。外部配置需要创建新的隔离空间后再通过配置中心按资源迁移，避免把个人或未知目录误纳入工作空间生命周期。
 
 ### 兼容旧 profile
 
-如果新版注册表不存在，多开器会一次性扫描 `profiles/*/codex-home` 中全部带有效旧 marker 的 profile，并将它们直接迁移到新注册表：不移动、不复制、不重写其 `config.toml` 或 `auth.json`。旧单例注册文件成功迁移后会被移除，后续运行只认新结构。注册表已经存在时，可通过“使用已有工作空间”重新接入保留在本机的未注册空间。
+如果新版注册表不存在，多开器会一次性扫描 `profiles/*/codex-home` 中全部带有效旧 marker 的 profile，并将它们直接迁移到新注册表：不移动、不复制、不重写其 `config.toml` 或 `auth.json`；只会升级启动器 marker 以写入稳定 `ProfileId`。旧单例注册文件成功迁移后会被移除，后续运行只认新结构。注册表已经存在时，可通过“使用已有工作空间”重新接入保留在本机的未注册空间。
 
 ## 隔离边界
 
@@ -101,6 +101,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\audit-repository
 ```text
 %LOCALAPPDATA%\CodexChannelLauncher\
 ├─ state\profiles.json
+├─ state\profile-operation.lock
 ├─ profiles\<id>\codex-home\
 ├─ profiles\<id>\electron\
 ├─ runtime-cache\
@@ -121,12 +122,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\audit-repository
 - **全局规则**：`AGENTS.md` 与 `AGENTS.override.md` 双向逐文件 Diff / Merge；
 - **Memories**：轻量文件概览与双向合并，不加载超大逐行 Diff；
 - **Chrome / 电脑操作**：工作空间插件安装状态、开关和 Windows 应用允许列表；
-- **MCP**：对比两侧列表，迁移不含静态凭据的配置，新增、编辑、启停或删除工作空间 MCP；
+- **MCP**：对比两侧列表，迁移不含静态凭据的配置；引号键、`env`、`http_headers` 和疑似密钥字段同样会被阻止；
 - **权限**：工作空间 approval、sandbox、network 和 Windows sandbox 配置；
-- **快照 / 恢复**：变更前自动快照并支持手动恢复，始终排除 `auth.json`；
+- **快照 / 恢复**：变更前自动快照并支持手动恢复，始终排除 `auth.json`；恢复中途失败会立即使用安全快照自动回滚；
 - **删除工作空间**：默认只移除多开器入口并保留本地数据；只有显式勾选“同时删除本地内容”才清理该空间的 Codex Home、Electron 数据、快照、合并基线和专属运行副本。
 
 写入工作空间配置前需要退出工作空间 App。双向合并会修改箭头指向的目标侧，因此要求两个 App 都退出；任何指向个人侧的写入都由用户显式选择并再次确认。
+
+所有启动、删除、Profile 设置、配置中心与合并写入共用同一个跨进程操作锁。即使启动器状态文件缺失或损坏，运行中的隔离副本也会通过运行缓存 manifest 恢复归属；无法可信归属的缓存进程会保守阻止配置、删除和合并。运行副本复用前会核对完整文件集合，并对除启动器托管托盘图标外的全部文件执行 SHA-256 内容校验，额外文件或同长度篡改都会使校验失败。
 
 ## 本机数据与隐私
 

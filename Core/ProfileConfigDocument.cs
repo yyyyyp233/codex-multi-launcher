@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace CodexChannelLauncher.Core;
 
@@ -13,7 +12,7 @@ internal sealed record McpConfigInfo(
     bool ContainsSensitiveValues,
     string Fingerprint);
 
-internal sealed partial class ProfileConfigDocument
+internal sealed class ProfileConfigDocument
 {
     private readonly List<string> lines;
     private readonly string newline;
@@ -44,10 +43,16 @@ internal sealed partial class ProfileConfigDocument
         var range = GetRange(sectionName);
         for (var index = range.Start; index <= range.End && index < lines.Count; index++)
         {
-            if (TryReadKey(lines[index], out var candidate, out var value) &&
-                candidate.Equals(key, StringComparison.OrdinalIgnoreCase))
+            if (TryReadAssignment(index, range.End, out var assignment) &&
+                assignment is { } candidateAssignment &&
+                candidateAssignment.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
             {
-                return StripInlineComment(value).Trim();
+                return RemoveTomlComments(candidateAssignment.RawValue).Trim();
+            }
+
+            if (assignment is not null)
+            {
+                index = assignment.End;
             }
         }
 
@@ -74,13 +79,20 @@ internal sealed partial class ProfileConfigDocument
         var range = GetRange(sectionName);
         for (var index = range.Start; index <= range.End && index < lines.Count; index++)
         {
-            if (TryReadKey(lines[index], out var candidate, out _) &&
-                candidate.Equals(key, StringComparison.OrdinalIgnoreCase))
+            if (!TryReadAssignment(index, range.End, out var assignment) || assignment is null)
+            {
+                continue;
+            }
+
+            if (assignment.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
             {
                 var indent = lines[index][..(lines[index].Length - lines[index].TrimStart().Length)];
-                lines[index] = $"{indent}{key} = {rawValue}";
+                lines.RemoveRange(assignment.Start, assignment.End - assignment.Start + 1);
+                lines.Insert(assignment.Start, $"{indent}{key} = {rawValue}");
                 return;
             }
+
+            index = assignment.End;
         }
 
         if (sectionName is null)
@@ -98,7 +110,7 @@ internal sealed partial class ProfileConfigDocument
 
         var section = FindSections()
             .FirstOrDefault(candidate => !candidate.IsArray &&
-                                         candidate.Name.Equals(sectionName, StringComparison.OrdinalIgnoreCase));
+                                         SectionNamesEqual(candidate.Name, sectionName));
         if (section is null)
         {
             AppendBlock([$"[{sectionName}]", $"{key} = {rawValue}"]);
@@ -126,13 +138,25 @@ internal sealed partial class ProfileConfigDocument
     public void RemoveKey(string? sectionName, string key)
     {
         var range = GetRange(sectionName);
-        for (var index = range.End; index >= range.Start && index < lines.Count; index--)
+        var assignments = new List<AssignmentSpan>();
+        for (var index = range.Start; index <= range.End && index < lines.Count; index++)
         {
-            if (TryReadKey(lines[index], out var candidate, out _) &&
-                candidate.Equals(key, StringComparison.OrdinalIgnoreCase))
+            if (!TryReadAssignment(index, range.End, out var assignment) || assignment is null)
             {
-                lines.RemoveAt(index);
+                continue;
             }
+
+            if (assignment.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                assignments.Add(assignment);
+            }
+
+            index = assignment.End;
+        }
+
+        foreach (var assignment in assignments.OrderByDescending(item => item.Start))
+        {
+            lines.RemoveRange(assignment.Start, assignment.End - assignment.Start + 1);
         }
     }
 
@@ -140,8 +164,8 @@ internal sealed partial class ProfileConfigDocument
     {
         var ranges = FindSections()
             .Where(section =>
-                section.Name.Equals(sectionName, StringComparison.OrdinalIgnoreCase) ||
-                section.Name.StartsWith(sectionName + ".", StringComparison.OrdinalIgnoreCase))
+                SectionNamesEqual(section.Name, sectionName) ||
+                IsSectionDescendant(section.Name, sectionName))
             .OrderByDescending(section => section.Start)
             .ToArray();
         foreach (var section in ranges)
@@ -155,8 +179,8 @@ internal sealed partial class ProfileConfigDocument
     public bool HasNamedPermissionProfiles() =>
         GetRawValue(null, "default_permissions") is not null ||
         FindSections().Any(section =>
-            section.Name.Equals("permissions", StringComparison.OrdinalIgnoreCase) ||
-            section.Name.StartsWith("permissions.", StringComparison.OrdinalIgnoreCase));
+            SectionNamesEqual(section.Name, "permissions") ||
+            IsSectionDescendant(section.Name, "permissions"));
 
     public bool IsPluginEnabled(string pluginId, bool fallback = false) =>
         GetBool($"plugins.\"{EscapeQuotedKey(pluginId)}\"", "enabled", fallback);
@@ -167,7 +191,7 @@ internal sealed partial class ProfileConfigDocument
     public bool IsSkillEnabled(string skillPath)
     {
         foreach (var section in FindSections().Where(section => section.IsArray &&
-                                                               section.Name.Equals("skills.config", StringComparison.OrdinalIgnoreCase)))
+                                                               SectionNamesEqual(section.Name, "skills.config")))
         {
             var configuredPath = GetValueWithin(section, "path");
             if (configuredPath is null || !PathsEqual(ParseTomlString(configuredPath), skillPath))
@@ -184,7 +208,7 @@ internal sealed partial class ProfileConfigDocument
     public void SetSkillEnabled(string skillPath, bool enabled)
     {
         foreach (var section in FindSections().Where(section => section.IsArray &&
-                                                               section.Name.Equals("skills.config", StringComparison.OrdinalIgnoreCase)))
+                                                               SectionNamesEqual(section.Name, "skills.config")))
         {
             var configuredPath = GetValueWithin(section, "path");
             if (configuredPath is null || !PathsEqual(ParseTomlString(configuredPath), skillPath))
@@ -327,7 +351,7 @@ internal sealed partial class ProfileConfigDocument
         var related = sections.Where(section => IsMcpSectionFor(section.Name, name)).ToArray();
         var normalized = string.Join("\n", related.SelectMany(section =>
                 lines.Skip(section.Start).Take(section.End - section.Start + 1))
-            .Select(line => StripInlineComment(line).Trim())
+            .Select(line => RemoveTomlComments(line).Trim())
             .Where(line => line.Length > 0));
         var sensitive = related.Any(SectionContainsSensitiveValues);
         return new McpConfigInfo(
@@ -343,20 +367,21 @@ internal sealed partial class ProfileConfigDocument
     private bool SectionContainsSensitiveValues(SectionSpan section)
     {
         var parts = SplitDottedName(section.Name);
-        if (parts.Count >= 3 && parts[^1].Equals("env", StringComparison.OrdinalIgnoreCase))
+        if (parts.Count >= 3 &&
+            (parts[^1].Equals("env", StringComparison.OrdinalIgnoreCase) ||
+             parts[^1].Equals("http_headers", StringComparison.OrdinalIgnoreCase)))
         {
-            return Enumerable.Range(section.Start + 1, Math.Max(0, section.End - section.Start))
-                .Any(index => index < lines.Count && TryReadKey(lines[index], out _, out _));
+            return HasAssignment(section);
         }
 
         for (var index = section.Start + 1; index <= section.End && index < lines.Count; index++)
         {
-            if (!TryReadKey(lines[index], out var key, out _))
+            if (!TryReadAssignment(index, section.End, out var assignment) || assignment is null)
             {
                 continue;
             }
 
-            var lower = key.ToLowerInvariant();
+            var lower = assignment.Key.ToLowerInvariant();
             if (lower is "env_vars" or "env_http_headers" or "bearer_token_env_var")
             {
                 continue;
@@ -370,6 +395,8 @@ internal sealed partial class ProfileConfigDocument
             {
                 return true;
             }
+
+            index = assignment.End;
         }
 
         return false;
@@ -398,7 +425,7 @@ internal sealed partial class ProfileConfigDocument
         }
 
         var section = sections.FirstOrDefault(candidate => !candidate.IsArray &&
-                                                           candidate.Name.Equals(sectionName, StringComparison.OrdinalIgnoreCase));
+                                                           SectionNamesEqual(candidate.Name, sectionName));
         return section is null ? (0, -1) : (section.Start + 1, section.End);
     }
 
@@ -407,7 +434,14 @@ internal sealed partial class ProfileConfigDocument
         var result = new List<SectionSpan>();
         for (var index = 0; index < lines.Count; index++)
         {
-            var trimmed = lines[index].Trim();
+            if (TryReadAssignment(index, lines.Count - 1, out var assignment) &&
+                assignment is not null)
+            {
+                index = assignment.End;
+                continue;
+            }
+
+            var trimmed = RemoveTomlComments(lines[index]).Trim();
             var isArray = trimmed.StartsWith("[[", StringComparison.Ordinal) &&
                           trimmed.EndsWith("]]", StringComparison.Ordinal);
             var isTable = !isArray && trimmed.StartsWith("[", StringComparison.Ordinal) &&
@@ -433,11 +467,17 @@ internal sealed partial class ProfileConfigDocument
     {
         for (var index = section.Start + 1; index <= section.End && index < lines.Count; index++)
         {
-            if (TryReadKey(lines[index], out var candidate, out var value) &&
-                candidate.Equals(key, StringComparison.OrdinalIgnoreCase))
+            if (!TryReadAssignment(index, section.End, out var assignment) || assignment is null)
             {
-                return StripInlineComment(value).Trim();
+                continue;
             }
+
+            if (assignment.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                return RemoveTomlComments(assignment.RawValue).Trim();
+            }
+
+            index = assignment.End;
         }
 
         return null;
@@ -447,12 +487,19 @@ internal sealed partial class ProfileConfigDocument
     {
         for (var index = section.Start + 1; index <= section.End && index < lines.Count; index++)
         {
-            if (TryReadKey(lines[index], out var candidate, out _) &&
-                candidate.Equals(key, StringComparison.OrdinalIgnoreCase))
+            if (!TryReadAssignment(index, section.End, out var assignment) || assignment is null)
             {
-                lines[index] = $"{key} = {rawValue}";
+                continue;
+            }
+
+            if (assignment.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                lines.RemoveRange(assignment.Start, assignment.End - assignment.Start + 1);
+                lines.Insert(assignment.Start, $"{key} = {rawValue}");
                 return;
             }
+
+            index = assignment.End;
         }
 
         lines.Insert(section.End + 1, $"{key} = {rawValue}");
@@ -485,28 +532,41 @@ internal sealed partial class ProfileConfigDocument
         }
     }
 
-    private static bool TryReadKey(string line, out string key, out string value)
+    private bool TryReadAssignment(
+        int start,
+        int maximumEnd,
+        out AssignmentSpan? assignment)
     {
-        var match = KeyRegex().Match(line);
-        if (!match.Success)
+        assignment = null;
+        if (start < 0 || start >= lines.Count ||
+            !TryReadKey(lines[start], out var key, out var firstValue))
         {
-            key = string.Empty;
-            value = string.Empty;
             return false;
         }
 
-        key = match.Groups["key"].Value;
-        value = match.Groups["value"].Value;
+        var rawValue = new StringBuilder(firstValue);
+        var end = start;
+        while (!IsTomlValueComplete(rawValue.ToString()) &&
+               end < maximumEnd &&
+               end + 1 < lines.Count)
+        {
+            end++;
+            rawValue.Append('\n').Append(lines[end]);
+        }
+
+        assignment = new AssignmentSpan(start, end, key, rawValue.ToString());
         return true;
     }
 
-    private static string StripInlineComment(string value)
+    private static bool TryReadKey(string line, out string key, out string value)
     {
+        key = string.Empty;
+        value = string.Empty;
         var quote = '\0';
         var escaped = false;
-        for (var index = 0; index < value.Length; index++)
+        for (var index = 0; index < line.Length; index++)
         {
-            var character = value[index];
+            var character = line[index];
             if (escaped)
             {
                 escaped = false;
@@ -527,11 +587,100 @@ internal sealed partial class ProfileConfigDocument
 
             if (character == '#' && quote == '\0')
             {
-                return value[..index];
+                return false;
             }
+
+            if (character != '=' || quote != '\0')
+            {
+                continue;
+            }
+
+            var rawKey = line[..index].Trim();
+            var parts = SplitDottedName(rawKey);
+            if (parts.Count == 0 || parts.Any(part => string.IsNullOrWhiteSpace(part)))
+            {
+                return false;
+            }
+
+            key = string.Join('.', parts);
+            value = line[(index + 1)..];
+            return true;
         }
 
-        return value;
+        return false;
+    }
+
+    private static string RemoveTomlComments(string value)
+    {
+        var result = new StringBuilder(value.Length);
+        var quote = '\0';
+        var triple = false;
+        var escaped = false;
+        var comment = false;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (comment)
+            {
+                if (character == '\n')
+                {
+                    comment = false;
+                    result.Append(character);
+                }
+
+                continue;
+            }
+
+            if (escaped)
+            {
+                result.Append(character);
+                escaped = false;
+                continue;
+            }
+
+            if (quote == '"' && character == '\\')
+            {
+                result.Append(character);
+                escaped = true;
+                continue;
+            }
+
+            if (character is '"' or '\'')
+            {
+                var isTriple = index + 2 < value.Length &&
+                               value[index + 1] == character &&
+                               value[index + 2] == character;
+                if (quote == '\0')
+                {
+                    quote = character;
+                    triple = isTriple;
+                }
+                else if (quote == character && triple == isTriple)
+                {
+                    quote = '\0';
+                    triple = false;
+                }
+
+                result.Append(character);
+                if (isTriple)
+                {
+                    result.Append(character).Append(character);
+                    index += 2;
+                }
+
+                continue;
+            }
+
+            if (character == '#' && quote == '\0')
+            {
+                comment = true;
+                continue;
+            }
+
+            result.Append(character);
+        }
+
+        return result.ToString();
     }
 
     private static string? ParseTomlString(string? raw)
@@ -541,7 +690,7 @@ internal sealed partial class ProfileConfigDocument
             return null;
         }
 
-        raw = StripInlineComment(raw).Trim();
+        raw = RemoveTomlComments(raw).Trim();
         if (raw.Length >= 2 && raw[0] == '"' && raw[^1] == '"')
         {
             return raw[1..^1]
@@ -564,7 +713,7 @@ internal sealed partial class ProfileConfigDocument
             return [];
         }
 
-        raw = StripInlineComment(raw).Trim();
+        raw = RemoveTomlComments(raw).Trim();
         if (!raw.StartsWith("[", StringComparison.Ordinal) || !raw.EndsWith("]", StringComparison.Ordinal))
         {
             return [];
@@ -650,7 +799,7 @@ internal sealed partial class ProfileConfigDocument
 
             if (character == '.' && quote == '\0')
             {
-                result.Add(current.ToString());
+                result.Add(current.ToString().Trim());
                 current.Clear();
                 continue;
             }
@@ -658,8 +807,125 @@ internal sealed partial class ProfileConfigDocument
             current.Append(character);
         }
 
-        result.Add(current.ToString());
+        result.Add(current.ToString().Trim());
         return result;
+    }
+
+    private static bool IsTomlValueComplete(string value)
+    {
+        var quote = '\0';
+        var triple = false;
+        var escaped = false;
+        var comment = false;
+        var squareDepth = 0;
+        var braceDepth = 0;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (comment)
+            {
+                if (character == '\n')
+                {
+                    comment = false;
+                }
+
+                continue;
+            }
+
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+
+            if (quote == '"' && character == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+
+            if (character is '"' or '\'')
+            {
+                var isTriple = index + 2 < value.Length &&
+                               value[index + 1] == character &&
+                               value[index + 2] == character;
+                if (quote == '\0')
+                {
+                    quote = character;
+                    triple = isTriple;
+                }
+                else if (quote == character && triple == isTriple)
+                {
+                    quote = '\0';
+                    triple = false;
+                }
+
+                if (isTriple)
+                {
+                    index += 2;
+                }
+
+                continue;
+            }
+
+            if (quote != '\0')
+            {
+                continue;
+            }
+
+            if (character == '#')
+            {
+                comment = true;
+            }
+            else if (character == '[')
+            {
+                squareDepth++;
+            }
+            else if (character == ']')
+            {
+                squareDepth--;
+            }
+            else if (character == '{')
+            {
+                braceDepth++;
+            }
+            else if (character == '}')
+            {
+                braceDepth--;
+            }
+        }
+
+        return quote == '\0' && squareDepth <= 0 && braceDepth <= 0;
+    }
+
+    private bool HasAssignment(SectionSpan section)
+    {
+        for (var index = section.Start + 1; index <= section.End && index < lines.Count; index++)
+        {
+            if (!TryReadAssignment(index, section.End, out var assignment) || assignment is null)
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool SectionNamesEqual(string left, string right) =>
+        SplitDottedName(left).SequenceEqual(
+            SplitDottedName(right),
+            StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsSectionDescendant(string candidate, string parent)
+    {
+        var candidateParts = SplitDottedName(candidate);
+        var parentParts = SplitDottedName(parent);
+        return candidateParts.Count > parentParts.Count &&
+               candidateParts.Take(parentParts.Count).SequenceEqual(
+                   parentParts,
+                   StringComparer.OrdinalIgnoreCase);
     }
 
     private static bool PathsEqual(string? left, string right)
@@ -691,6 +957,9 @@ internal sealed partial class ProfileConfigDocument
 
     private sealed record SectionSpan(string Name, bool IsArray, int Start, int End);
 
-    [GeneratedRegex(@"^\s*(?<key>[A-Za-z0-9_.-]+)\s*=\s*(?<value>.*)$")]
-    private static partial Regex KeyRegex();
+    private sealed record AssignmentSpan(
+        int Start,
+        int End,
+        string Key,
+        string RawValue);
 }

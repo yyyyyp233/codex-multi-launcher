@@ -7,8 +7,6 @@ namespace CodexChannelLauncher.Core;
 
 public sealed class ProfileCoordinator
 {
-    private const string CrossProcessGateName = @"Local\CodexChannelLauncher.ProfileOperation";
-
     private static readonly string[] ScrubbedEnvironmentVariables =
     [
         "CODEX_HOME",
@@ -83,6 +81,7 @@ public sealed class ProfileCoordinator
     public CompanyProfileMetadata ConfigureWorkProfile(ProfileSetupRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var operationGate = LauncherOperationGate.Acquire(Paths);
         if (!string.IsNullOrWhiteSpace(request.ProfileId) && IsManagedProfileRunning(request.ProfileId))
         {
             throw new InvalidOperationException("请先退出该隔离空间的 Codex App，再编辑连接配置。");
@@ -99,53 +98,40 @@ public sealed class ProfileCoordinator
             throw new ArgumentException("必须指定要删除的工作空间。", nameof(profileId));
         }
 
-        using var crossProcessGate = new Semaphore(1, 1, CrossProcessGateName);
-        var crossProcessGateHeld = crossProcessGate.WaitOne(TimeSpan.FromSeconds(45));
-        if (!crossProcessGateHeld)
+        using var operationGate = LauncherOperationGate.Acquire(Paths);
+        var registration = ResolveRegistration(profileId);
+        if (IsManagedProfileRunning(profileId))
         {
-            throw new TimeoutException("另一个多开器窗口正在执行实例操作，请稍后重试。");
+            throw new InvalidOperationException(
+                $"请先完全退出 {registration.DisplayName}，再删除工作空间。");
         }
 
+        var result = profileManager.Delete(profileId, deleteLocalContent);
         try
         {
-            var registration = ResolveRegistration(profileId);
-            if (IsManagedProfileRunning(profileId))
+            var state = stateStore.Load();
+            state.ProfileRootProcesses ??=
+                new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
+            state.ProfileRootProcesses.Remove(profileId);
+            if (string.Equals(
+                    state.LastLaunchProfileId,
+                    profileId,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException(
-                    $"请先完全退出 {registration.DisplayName}，再删除工作空间。");
+                state.LastLaunchProfileId = null;
             }
 
-            var result = profileManager.Delete(profileId, deleteLocalContent);
-            try
-            {
-                var state = stateStore.Load();
-                state.ProfileRootProcesses ??=
-                    new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
-                state.ProfileRootProcesses.Remove(profileId);
-                if (string.Equals(
-                        state.LastLaunchProfileId,
-                        profileId,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    state.LastLaunchProfileId = null;
-                }
-
-                stateStore.Save(state);
-            }
-            catch (Exception exception)
-            {
-                log.Error($"Deleted profile state cleanup failed: profile={profileId}", exception);
-            }
-
-            log.Info(
-                $"Profile deleted: profile={profileId}, localContentDeleted={deleteLocalContent}, " +
-                $"cleanupPending={result.CleanupPendingPath is not null}");
-            return result;
+            stateStore.Save(state);
         }
-        finally
+        catch (Exception exception)
         {
-            crossProcessGate.Release();
+            log.Error($"Deleted profile state cleanup failed: profile={profileId}", exception);
         }
+
+        log.Info(
+            $"Profile deleted: profile={profileId}, localContentDeleted={deleteLocalContent}, " +
+            $"cleanupPending={result.CleanupPendingPath is not null}");
+        return result;
     }
 
     public RuntimeStatus GetStatus()
@@ -172,17 +158,29 @@ public sealed class ProfileCoordinator
             problem = CombineProblems(problem, exception.Message);
         }
 
-        var state = NormalizeState(registrations, out var stateChanged);
+        var roots = ProcessInventory.GetChatGptRoots();
+        var ownership = ProcessInventory.ClassifyChatGptRoots(Paths, roots);
+        var state = NormalizeState(registrations, ownership, out var stateChanged);
         if (stateChanged)
         {
             stateStore.Save(state);
         }
 
-        var roots = ProcessInventory.GetChatGptRoots();
-        var managedProcessIds = state.ProfileRootProcesses.Values
-            .Select(marker => marker.ProcessId)
-            .ToHashSet();
-        var personalRoots = roots.Where(root => !managedProcessIds.Contains(root.ProcessId)).ToArray();
+        var validProfileIds = registrations.Select(profile => profile.ProfileId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unresolvedManagedProcesses = ownership.Where(item =>
+                item.IsRuntimeCache &&
+                (string.IsNullOrWhiteSpace(item.ProfileId) ||
+                 !validProfileIds.Contains(item.ProfileId)))
+            .ToArray();
+        if (unresolvedManagedProcesses.Length > 0)
+        {
+            problem = CombineProblems(
+                problem,
+                "检测到无法归属到已注册空间的运行副本；在其退出前将阻止配置、删除和合并操作。");
+        }
+
+        var personalRoots = ownership.Where(item => !item.IsRuntimeCache).ToArray();
         var profileStatuses = new List<ManagedProfileRuntimeStatus>();
         var selectedDirectory = Paths.WorkProfileDirectoryName;
         try
@@ -220,7 +218,8 @@ public sealed class ProfileCoordinator
             personalRoots.Length,
             package,
             profileStatuses,
-            problem);
+            problem,
+            unresolvedManagedProcesses.Length > 0);
     }
 
     public Task<LaunchOutcome> LaunchAsync(
@@ -236,19 +235,10 @@ public sealed class ProfileCoordinator
         CancellationToken cancellationToken = default)
     {
         await launchGate.WaitAsync(cancellationToken);
-        Semaphore? crossProcessGate = null;
-        var crossProcessGateHeld = false;
+        IDisposable? operationGate = null;
         try
         {
-            crossProcessGate = new Semaphore(1, 1, CrossProcessGateName);
-            crossProcessGateHeld = await Task.Run(
-                () => crossProcessGate.WaitOne(TimeSpan.FromSeconds(45)),
-                CancellationToken.None);
-            if (!crossProcessGateHeld)
-            {
-                throw new TimeoutException("另一个多开器窗口正在执行实例操作，请稍后重试。");
-            }
-
+            operationGate = await LauncherOperationGate.AcquireAsync(Paths, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             ManagedProfileRegistration? registration = null;
             if (channel == ChannelKind.Company)
@@ -267,10 +257,12 @@ public sealed class ProfileCoordinator
                 ? status.PersonalRunning
                 : targetProfile?.Running == true;
             var otherRunning = channel == ChannelKind.Personal
-                ? status.ManagedProfiles.Any(profile => profile.Running)
+                ? status.ManagedProfiles.Any(profile => profile.Running) ||
+                  status.UnresolvedManagedProcessRunning
                 : status.PersonalRunning || status.ManagedProfiles.Any(profile =>
                     profile.Running &&
-                    !profile.Registration.ProfileId.Equals(registration!.ProfileId, StringComparison.OrdinalIgnoreCase));
+                    !profile.Registration.ProfileId.Equals(registration!.ProfileId, StringComparison.OrdinalIgnoreCase)) ||
+                  status.UnresolvedManagedProcessRunning;
 
             if (otherRunning && !allowParallel)
             {
@@ -385,12 +377,7 @@ public sealed class ProfileCoordinator
         }
         finally
         {
-            if (crossProcessGateHeld)
-            {
-                crossProcessGate!.Release();
-            }
-
-            crossProcessGate?.Dispose();
+            operationGate?.Dispose();
             launchGate.Release();
         }
     }
@@ -549,12 +536,20 @@ public sealed class ProfileCoordinator
     {
         var state = stateStore.Load();
         state.ProfileRootProcesses ??= new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
-        return state.ProfileRootProcesses.TryGetValue(profileId, out var marker) &&
-               ProcessInventory.IsAlive(marker);
+        state.ProfileRootProcesses.TryGetValue(profileId, out var marker);
+        var registeredProfileIds = profileManager.GetProfiles()
+            .Select(profile => profile.ProfileId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return ProcessInventory.IsProfileMutationBlocked(
+            Paths,
+            profileId,
+            marker,
+            registeredProfileIds);
     }
 
     private LauncherState NormalizeState(
         IReadOnlyList<ManagedProfileRegistration> registrations,
+        IReadOnlyList<ChatGptProcessOwnership> ownership,
         out bool changed)
     {
         var state = stateStore.Load();
@@ -581,6 +576,28 @@ public sealed class ProfileCoordinator
                 !ProcessInventory.IsAlive(state.ProfileRootProcesses[registeredProfileId]))
             {
                 state.ProfileRootProcesses.Remove(registeredProfileId);
+                changed = true;
+            }
+        }
+
+        foreach (var item in ownership.Where(item =>
+                     item.IsRuntimeCache &&
+                     !string.IsNullOrWhiteSpace(item.ProfileId) &&
+                     validProfileIds.Contains(item.ProfileId)))
+        {
+            var profileId = item.ProfileId!;
+            var recovered = new ProcessMarker(
+                item.Process.ProcessId,
+                item.Process.StartedAtUtc,
+                item.Process.ExecutablePath);
+            if (!state.ProfileRootProcesses.TryGetValue(profileId, out var current) ||
+                current.ProcessId != recovered.ProcessId ||
+                current.StartedAtUtc != recovered.StartedAtUtc ||
+                !current.ExecutablePath.Equals(
+                    recovered.ExecutablePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                state.ProfileRootProcesses[profileId] = recovered;
                 changed = true;
             }
         }

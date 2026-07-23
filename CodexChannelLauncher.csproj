@@ -13,6 +13,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\CodexChannelLauncher.ico</ApplicationIcon>
     <Version>1.5.0-preview.1</Version>
+    <FileVersion>1.5.0.1</FileVersion>
     <Authors>yyyyyp233</Authors>
     <Description>非官方 Windows Codex App 多开与隔离工作空间启动器。</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

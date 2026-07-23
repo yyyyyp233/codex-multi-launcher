@@ -47,6 +47,8 @@ dotnet restore CodexMultiLauncher.slnx
 dotnet run --project CodexChannelLauncher.csproj -c Release
 ```
 
+正常主窗口的关闭按钮与 `Alt+F4` 会把多开器隐藏到系统托盘，不结束后台进程。单击托盘图标或右键选择“显示主窗口”可恢复窗口；只有托盘右键菜单中的“退出多开器”才会彻底退出。Windows 注销或关机不会被该行为拦截。
+
 验证源码：
 
 ```powershell

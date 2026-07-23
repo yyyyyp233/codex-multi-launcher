@@ -18,7 +18,7 @@ public enum WorkProfileSetupState
 public enum ProfileSetupMode
 {
     Create,
-    Import,
+    Attach,
     Update
 }
 
@@ -58,7 +58,7 @@ public sealed record ProfileSetupRequest(
     string Model = "",
     string ReasoningEffort = "high",
     string ApiKey = "",
-    string? ImportSourceHome = null,
+    string? ExistingCodexHome = null,
     string? ProfileId = null,
     ProfileAuthMode AuthMode = ProfileAuthMode.CustomResponses);
 

@@ -79,20 +79,20 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\audit-repository
 
 生成的核心配置采用 `responses` wire API，并默认启用网络访问和响应不落库配置。具体 Provider、模型和端点完全由用户填写，仓库不内置组织通道。
 
-### 导入已有 Codex Home
+### 使用已有工作空间
 
-导入采用固定白名单：
+“使用已有工作空间”是原地接入，不是复制或新建。可选择：
 
-- `config.toml`、`auth.json`；
-- `AGENTS.md`、`AGENTS.override.md`；
-- 用户 Skills（排除 `.system`、重解析点和常见凭据文件）；
-- 受管 Memories。
+- `%LOCALAPPDATA%\CodexChannelLauncher\profiles\<目录名>` 工作空间目录；
+- 或其下的 `codex-home` 目录。
 
-任务会话、SQLite、日志、插件缓存、Electron 数据、系统 Skills 和其他根目录不会复制。导入源只读，测试会核对源目录前后不变。
+所选目录必须带有有效的多开器 marker。接入只向 `profiles.json` 增加注册，不移动、不复制、不重写原工作空间；任务会话、SQLite、插件、Skills、Memories 和同级 Electron 数据都继续使用原位置。
+
+个人 `%USERPROFILE%\.codex` 和 `profiles` 根目录之外的任意 Codex Home 会被拒绝绑定。外部配置需要创建新的隔离空间后再通过配置中心按资源迁移，避免把个人或未知目录误纳入工作空间生命周期。
 
 ### 兼容旧 profile
 
-如果新版注册表不存在，多开器会一次性扫描 `profiles/*/codex-home` 中全部带有效旧 marker 的 profile，并将它们直接迁移到新注册表：不移动、不复制、不重写其 `config.toml` 或 `auth.json`。旧单例注册文件成功迁移后会被移除，后续运行只认新结构。
+如果新版注册表不存在，多开器会一次性扫描 `profiles/*/codex-home` 中全部带有效旧 marker 的 profile，并将它们直接迁移到新注册表：不移动、不复制、不重写其 `config.toml` 或 `auth.json`。旧单例注册文件成功迁移后会被移除，后续运行只认新结构。注册表已经存在时，可通过“使用已有工作空间”重新接入保留在本机的未注册空间。
 
 ## 隔离边界
 

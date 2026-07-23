@@ -88,7 +88,7 @@ public partial class WorkProfileSetupWindow : Window
 
     private void ModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ImportPanel is not null)
+        if (AttachPanel is not null)
         {
             UpdateModePanels();
         }
@@ -104,17 +104,17 @@ public partial class WorkProfileSetupWindow : Window
 
     private void UpdateModePanels()
     {
-        var import = !editingExisting && SelectedMode() == ProfileSetupMode.Import;
+        var attach = !editingExisting && SelectedMode() == ProfileSetupMode.Attach;
         var authMode = SelectedAuthMode();
-        ImportPanel.Visibility = import ? Visibility.Visible : Visibility.Collapsed;
-        AuthenticationPanel.Visibility = import ? Visibility.Collapsed : Visibility.Visible;
-        CustomProviderPanel.Visibility = !import && authMode == ProfileAuthMode.CustomResponses
+        AttachPanel.Visibility = attach ? Visibility.Visible : Visibility.Collapsed;
+        AuthenticationPanel.Visibility = attach ? Visibility.Collapsed : Visibility.Visible;
+        CustomProviderPanel.Visibility = !attach && authMode == ProfileAuthMode.CustomResponses
             ? Visibility.Visible
             : Visibility.Collapsed;
-        ModelSettingsPanel.Visibility = !import && authMode != ProfileAuthMode.ChatGptAccount
+        ModelSettingsPanel.Visibility = !attach && authMode != ProfileAuthMode.ChatGptAccount
             ? Visibility.Visible
             : Visibility.Collapsed;
-        ApiKeyPanel.Visibility = !import && authMode != ProfileAuthMode.ChatGptAccount
+        ApiKeyPanel.Visibility = !attach && authMode != ProfileAuthMode.ChatGptAccount
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -125,21 +125,21 @@ public partial class WorkProfileSetupWindow : Window
                 : "第三方 Key 仅写入当前空间的 auth.json，不会进入日志或快照。";
         SaveButtonText.Text = editingExisting
             ? "保存修改"
-            : import
-                ? "导入隔离空间"
+            : attach
+                ? "接入已有空间"
                 : "创建隔离空间";
     }
 
-    private void BrowseImportButton_Click(object sender, RoutedEventArgs e)
+    private void BrowseExistingButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "选择已有 Codex Home",
+            Title = "选择已有工作空间目录或 Codex Home",
             Multiselect = false
         };
         if (dialog.ShowDialog(this) == true)
         {
-            ImportPathBox.Text = dialog.FolderName;
+            ExistingPathBox.Text = dialog.FolderName;
         }
     }
 
@@ -155,7 +155,7 @@ public partial class WorkProfileSetupWindow : Window
             ModelBox.Text,
             SelectedReasoningEffort(),
             ApiKeyBox.Password,
-            ImportPathBox.Text,
+            ExistingPathBox.Text,
             ProfileId: profileId,
             AuthMode: SelectedAuthMode());
         await SaveAsync(request);
@@ -170,7 +170,9 @@ public partial class WorkProfileSetupWindow : Window
 
         isBusy = true;
         SaveButton.IsEnabled = false;
-        FooterText.Text = "正在安全写入隔离配置…";
+        FooterText.Text = request.Mode == ProfileSetupMode.Attach
+            ? "正在原地注册已有工作空间…"
+            : "正在安全写入隔离配置…";
         try
         {
             await Task.Run(() => coordinator.ConfigureWorkProfile(request));
@@ -191,8 +193,8 @@ public partial class WorkProfileSetupWindow : Window
     }
 
     private ProfileSetupMode SelectedMode() =>
-        (ModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "Import"
-            ? ProfileSetupMode.Import
+        (ModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "Attach"
+            ? ProfileSetupMode.Attach
             : ProfileSetupMode.Create;
 
     private ProfileAuthMode SelectedAuthMode() =>

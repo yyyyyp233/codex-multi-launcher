@@ -87,54 +87,67 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
-    public void ImportCopiesOnlyTheDocumentedAllowlistAndDoesNotModifySource()
+    public void AttachExistingProfileUsesSelectedDataInPlaceWithoutCreatingCopy()
     {
         using var fixture = new TestFixture();
-        var source = Path.Combine(fixture.Root, "import-source");
-        CreateImportSource(source, "import-key");
-        var sourceBefore = FingerprintDirectory(source);
+        fixture.Manager.Configure(fixture.CreateRequest("seed-key"));
+        var home = fixture.CreateLegacyCandidate(
+            "taishi",
+            "existing-key",
+            "company-app-codex-home");
+        var profileRoot = Directory.GetParent(home)!.FullName;
+        var session = Path.Combine(home, "sessions", "existing-thread.jsonl");
+        var state = Path.Combine(home, "state_5.sqlite");
+        var globalState = Path.Combine(home, ".codex-global-state.json");
+        var electronState = Path.Combine(profileRoot, "electron", "Default", "Preferences");
+        Directory.CreateDirectory(Path.GetDirectoryName(session)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(electronState)!);
+        File.WriteAllText(session, """{"type":"existing-thread"}""");
+        File.WriteAllText(state, "existing-sqlite");
+        File.WriteAllText(globalState, """{"selected-project":{"type":"local"}}""");
+        File.WriteAllText(electronState, """{"existing-window-state":true}""");
+        var before = FingerprintDirectory(profileRoot);
 
-        fixture.Manager.Configure(new ProfileSetupRequest(
-            ProfileSetupMode.Import,
-            "导入空间",
-            ImportSourceHome: source));
+        var registration = fixture.Manager.Configure(new ProfileSetupRequest(
+            ProfileSetupMode.Attach,
+            "公司空间",
+            ExistingCodexHome: profileRoot));
 
-        Assert.Equal(sourceBefore, FingerprintDirectory(source));
-        Assert.True(File.Exists(fixture.Paths.CompanyConfig));
-        Assert.True(File.Exists(fixture.Paths.CompanyAuth));
-        Assert.True(File.Exists(Path.Combine(fixture.Paths.CompanyCodexHome, "AGENTS.md")));
-        Assert.True(File.Exists(Path.Combine(fixture.Paths.CompanySkills, "user-skill", "SKILL.md")));
-        Assert.True(File.Exists(Path.Combine(fixture.Paths.CompanyMemories, "notes", "durable.md")));
-        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.CompanySkills, ".system")));
-        Assert.False(File.Exists(Path.Combine(fixture.Paths.CompanySkills, "user-skill", ".env")));
-        Assert.False(File.Exists(Path.Combine(fixture.Paths.CompanyMemories, ".git", "config")));
-        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.CompanyCodexHome, "sessions")));
-        Assert.False(File.Exists(Path.Combine(fixture.Paths.CompanyCodexHome, "state.sqlite")));
-        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.CompanyCodexHome, "logs")));
-        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.CompanyCodexHome, "plugins")));
+        Assert.Equal("taishi", registration.ProfileDirectoryName);
+        Assert.Equal(home, fixture.Paths.CompanyCodexHome);
+        Assert.Equal(before, FingerprintDirectory(profileRoot));
+        Assert.Equal(2, fixture.Manager.GetProfiles().Count);
+        Assert.True(File.Exists(session));
+        Assert.True(File.Exists(state));
+        Assert.True(File.Exists(globalState));
+        Assert.True(File.Exists(electronState));
+        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.ProfilesRoot, "work-2")));
     }
 
     [Fact]
-    public void ImportingThePersonalCodexHomeLeavesEveryPersonalFileUnchanged()
+    public void AttachRejectsPersonalCodexHomeWithoutModifyingIt()
     {
         using var fixture = new TestFixture();
+        fixture.Manager.Configure(fixture.CreateRequest("seed-key"));
         File.WriteAllText(fixture.Paths.PersonalConfig, TestFixture.ValidConfig);
         File.WriteAllText(
             fixture.Paths.PersonalAuth,
             JsonSerializer.Serialize(
-                new Dictionary<string, string> { ["OPENAI_API_KEY"] = "personal-import-key" }));
+                new Dictionary<string, string> { ["OPENAI_API_KEY"] = "personal-key" }));
         Directory.CreateDirectory(Path.Combine(fixture.Paths.PersonalSkills, "personal-skill"));
         File.WriteAllText(
             Path.Combine(fixture.Paths.PersonalSkills, "personal-skill", "SKILL.md"),
             "# personal skill");
         var before = fixture.FingerprintPersonalFiles();
 
-        fixture.Manager.Configure(new ProfileSetupRequest(
-            ProfileSetupMode.Import,
-            "个人配置副本",
-            ImportSourceHome: fixture.Paths.PersonalCodexHome));
+        Assert.Throws<InvalidOperationException>(() => fixture.Manager.Configure(new ProfileSetupRequest(
+            ProfileSetupMode.Attach,
+            "个人空间",
+            ExistingCodexHome: fixture.Paths.PersonalCodexHome)));
 
         Assert.Equal(before, fixture.FingerprintPersonalFiles());
+        Assert.Single(fixture.Manager.GetProfiles());
+        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.ProfilesRoot, "work-2")));
     }
 
     [Fact]
@@ -312,6 +325,33 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
+    public void RetainedProfileCanBeReattachedInPlaceWithoutAllocatingANewDirectory()
+    {
+        using var fixture = new TestFixture();
+        var first = fixture.Manager.Configure(fixture.CreateRequest("first-key", displayName: "First"));
+        fixture.Manager.Configure(fixture.CreateRequest("second-key", displayName: "Second"));
+        var profileRoot = Path.Combine(fixture.Paths.ProfilesRoot, first.ProfileDirectoryName);
+        var codexHome = Path.Combine(profileRoot, "codex-home");
+        var session = Path.Combine(codexHome, "sessions", "retained-thread.jsonl");
+        Directory.CreateDirectory(Path.GetDirectoryName(session)!);
+        File.WriteAllText(session, """{"type":"retained-thread"}""");
+
+        fixture.Manager.Delete(first.ProfileId, deleteLocalContent: false);
+        var before = FingerprintDirectory(profileRoot);
+        var reattached = fixture.Manager.Configure(new ProfileSetupRequest(
+            ProfileSetupMode.Attach,
+            "First Reattached",
+            ExistingCodexHome: codexHome));
+
+        Assert.Equal("work", reattached.ProfileDirectoryName);
+        Assert.Equal(first.AccentColor, reattached.AccentColor);
+        Assert.Equal(codexHome, fixture.Paths.CompanyCodexHome);
+        Assert.Equal(before, FingerprintDirectory(profileRoot));
+        Assert.Equal(2, fixture.Manager.GetProfiles().Count);
+        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.ProfilesRoot, "work-3")));
+    }
+
+    [Fact]
     public void DeleteProfileWithLocalContentRemovesOnlyOwnedData()
     {
         using var fixture = new TestFixture();
@@ -462,19 +502,18 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
-    public void ImportWithoutApiKeyIsInferredAsChatGptAccount()
+    public void AttachWithoutApiKeyIsInferredAsChatGptAccount()
     {
         using var fixture = new TestFixture();
-        var source = Path.Combine(fixture.Root, "account-import");
-        Directory.CreateDirectory(source);
-        File.WriteAllText(
-            Path.Combine(source, "config.toml"),
+        fixture.Manager.Configure(fixture.CreateRequest("seed-key"));
+        var source = fixture.CreateAttachCandidate(
+            "account-existing",
             "network_access = \"enabled\"\ndisable_response_storage = true\n");
 
         var registration = fixture.Manager.Configure(new ProfileSetupRequest(
-            ProfileSetupMode.Import,
-            "Imported Account",
-            ImportSourceHome: source));
+            ProfileSetupMode.Attach,
+            "Existing Account",
+            ExistingCodexHome: source));
 
         Assert.Equal(ProfileAuthMode.ChatGptAccount, registration.AuthMode);
         Assert.False(File.Exists(fixture.Paths.CompanyAuth));
@@ -482,13 +521,12 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
-    public void ImportWithCustomProviderButWithoutApiKeyIsRejected()
+    public void AttachWithCustomProviderButWithoutApiKeyIsRejected()
     {
         using var fixture = new TestFixture();
-        var source = Path.Combine(fixture.Root, "custom-import-without-key");
-        Directory.CreateDirectory(source);
-        File.WriteAllText(
-            Path.Combine(source, "config.toml"),
+        fixture.Manager.Configure(fixture.CreateRequest("seed-key"));
+        var source = fixture.CreateAttachCandidate(
+            "custom-existing-without-key",
             """
             model_provider = "custom-provider"
             model = "example-model"
@@ -502,34 +540,31 @@ public sealed class WorkProfileManagerTests
             """);
 
         Assert.Throws<InvalidDataException>(() => fixture.Manager.Configure(new ProfileSetupRequest(
-            ProfileSetupMode.Import,
-            "Invalid Custom Import",
-            ImportSourceHome: source)));
-        Assert.Empty(fixture.Manager.GetProfiles());
-        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.ProfilesRoot, "work")));
+            ProfileSetupMode.Attach,
+            "Invalid Existing Custom",
+            ExistingCodexHome: source)));
+        Assert.Single(fixture.Manager.GetProfiles());
+        Assert.False(Directory.Exists(Path.Combine(fixture.Paths.ProfilesRoot, "work-2")));
     }
 
     [Fact]
-    public void ImportWithPlaceholderApiKeyIsNotMisclassifiedAsChatGptAccount()
+    public void AttachWithPlaceholderApiKeyIsNotMisclassifiedAsChatGptAccount()
     {
         using var fixture = new TestFixture();
-        var source = Path.Combine(fixture.Root, "placeholder-key-import");
-        Directory.CreateDirectory(source);
-        File.WriteAllText(
-            Path.Combine(source, "config.toml"),
-            "network_access = \"enabled\"\ndisable_response_storage = true\n");
-        File.WriteAllText(
-            Path.Combine(source, "auth.json"),
-            JsonSerializer.Serialize(new Dictionary<string, string>
+        fixture.Manager.Configure(fixture.CreateRequest("seed-key"));
+        var source = fixture.CreateAttachCandidate(
+            "placeholder-key-existing",
+            "network_access = \"enabled\"\ndisable_response_storage = true\n",
+            new Dictionary<string, string>
             {
                 ["OPENAI_API_KEY"] = "YOUR_API_KEY_HERE"
-            }));
+            });
 
         Assert.Throws<InvalidDataException>(() => fixture.Manager.Configure(new ProfileSetupRequest(
-            ProfileSetupMode.Import,
-            "Placeholder Import",
-            ImportSourceHome: source)));
-        Assert.Empty(fixture.Manager.GetProfiles());
+            ProfileSetupMode.Attach,
+            "Placeholder Existing",
+            ExistingCodexHome: source)));
+        Assert.Single(fixture.Manager.GetProfiles());
     }
 
     [Fact]
@@ -655,32 +690,6 @@ public sealed class WorkProfileManagerTests
         Assert.False(File.Exists(escapedPath));
     }
 
-    private static void CreateImportSource(string source, string apiKey)
-    {
-        Directory.CreateDirectory(source);
-        File.WriteAllText(Path.Combine(source, "config.toml"), TestFixture.ValidConfig);
-        File.WriteAllText(
-            Path.Combine(source, "auth.json"),
-            JsonSerializer.Serialize(new Dictionary<string, string> { ["OPENAI_API_KEY"] = apiKey }));
-        File.WriteAllText(Path.Combine(source, "AGENTS.md"), "portable rule");
-        Directory.CreateDirectory(Path.Combine(source, "skills", "user-skill"));
-        File.WriteAllText(Path.Combine(source, "skills", "user-skill", "SKILL.md"), "# user skill");
-        File.WriteAllText(Path.Combine(source, "skills", "user-skill", ".env"), "SECRET=value");
-        Directory.CreateDirectory(Path.Combine(source, "skills", ".system"));
-        File.WriteAllText(Path.Combine(source, "skills", ".system", "SKILL.md"), "system skill");
-        Directory.CreateDirectory(Path.Combine(source, "memories", "notes"));
-        File.WriteAllText(Path.Combine(source, "memories", "notes", "durable.md"), "durable");
-        Directory.CreateDirectory(Path.Combine(source, "memories", ".git"));
-        File.WriteAllText(Path.Combine(source, "memories", ".git", "config"), "private");
-        Directory.CreateDirectory(Path.Combine(source, "sessions"));
-        File.WriteAllText(Path.Combine(source, "sessions", "session.jsonl"), "task");
-        File.WriteAllText(Path.Combine(source, "state.sqlite"), "sqlite");
-        Directory.CreateDirectory(Path.Combine(source, "logs"));
-        File.WriteAllText(Path.Combine(source, "logs", "runtime.log"), "log");
-        Directory.CreateDirectory(Path.Combine(source, "plugins", "cache"));
-        File.WriteAllText(Path.Combine(source, "plugins", "cache", "plugin.bin"), "cache");
-    }
-
     private static string HashFile(string path)
     {
         using var stream = File.OpenRead(path);
@@ -781,17 +790,22 @@ public sealed class WorkProfileManagerTests
 
         public string FingerprintPersonalFiles() => FingerprintDirectory(Paths.PersonalCodexHome);
 
-        public string CreateLegacyCandidate(
+        public string CreateAttachCandidate(
             string directoryName,
-            string apiKey,
+            string config,
+            IReadOnlyDictionary<string, string>? auth = null,
             string authority = "legacy-isolated-profile")
         {
             var home = Path.Combine(Paths.ProfilesRoot, directoryName, "codex-home");
             Directory.CreateDirectory(home);
-            File.WriteAllText(Path.Combine(home, "config.toml"), ValidConfig);
-            File.WriteAllText(
-                Path.Combine(home, "auth.json"),
-                JsonSerializer.Serialize(new Dictionary<string, string> { ["OPENAI_API_KEY"] = apiKey }));
+            File.WriteAllText(Path.Combine(home, "config.toml"), config);
+            if (auth is not null)
+            {
+                File.WriteAllText(
+                    Path.Combine(home, "auth.json"),
+                    JsonSerializer.Serialize(auth));
+            }
+
             File.WriteAllText(
                 Path.Combine(home, "launcher-profile-v2.json"),
                 JsonSerializer.Serialize(new
@@ -802,6 +816,16 @@ public sealed class WorkProfileManagerTests
                 }));
             return home;
         }
+
+        public string CreateLegacyCandidate(
+            string directoryName,
+            string apiKey,
+            string authority = "legacy-isolated-profile")
+            => CreateAttachCandidate(
+                directoryName,
+                ValidConfig,
+                new Dictionary<string, string> { ["OPENAI_API_KEY"] = apiKey },
+                authority);
 
         public void Dispose()
         {

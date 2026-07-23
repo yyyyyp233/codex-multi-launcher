@@ -17,7 +17,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\audit-repository
 ## Pull requests
 
 - 每个 PR 聚焦一个可审查的主题，并说明行为变化、隔离边界和验证层级。
-- 新增配置写入或导入路径时，必须使用临时根目录测试，不得依赖真实 `%LOCALAPPDATA%` 或个人 Codex Home。
+- 新增配置写入、空间接入或资源迁移路径时，必须使用临时根目录测试，不得依赖真实 `%LOCALAPPDATA%` 或个人 Codex Home。
 - 不得提交 `dist/`、`artifacts/`、EXE、安装包、运行配置、第三方 App 文件或生成的凭据。
 - 不得在 Issue、PR、测试快照或日志中放入真实 API Key、内部域名、用户名、组织路径或完整本机日志。
 - UI 变化请提供脱敏截图；不得使用含真实账号、端点或任务数据的截图。

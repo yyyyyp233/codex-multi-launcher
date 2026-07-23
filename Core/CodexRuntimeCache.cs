@@ -291,7 +291,7 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
         }
     }
 
-    private static bool ContainsCompleteSourceTree(
+    internal static bool ContainsCompleteSourceTree(
         string sourceApp,
         string cachedApp,
         bool allowManagedTrayIconOverrides,
@@ -301,16 +301,38 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
         sourceFileCount = 0;
         sourceTotalBytes = 0;
 
-        foreach (var sourceFile in new DirectoryInfo(sourceApp)
-                     .EnumerateFiles("*", SearchOption.AllDirectories))
+        if (!Directory.Exists(sourceApp) || !Directory.Exists(cachedApp))
         {
-            var relativePath = Path.GetRelativePath(sourceApp, sourceFile.FullName);
-            var cachedPath = Path.Combine(cachedApp, relativePath);
-            if (!File.Exists(cachedPath) ||
-                (!allowManagedTrayIconOverrides && new FileInfo(cachedPath).Length != sourceFile.Length) ||
-                (allowManagedTrayIconOverrides &&
-                 !CompanyTrayIconBranding.IsManagedRelativePath(relativePath) &&
-                 new FileInfo(cachedPath).Length != sourceFile.Length))
+            return false;
+        }
+
+        var sourceFiles = Directory.EnumerateFiles(sourceApp, "*", SearchOption.AllDirectories)
+            .ToDictionary(
+                path => NormalizeRelativePath(sourceApp, path),
+                path => new FileInfo(path),
+                StringComparer.OrdinalIgnoreCase);
+        var cachedFiles = Directory.EnumerateFiles(cachedApp, "*", SearchOption.AllDirectories)
+            .ToDictionary(
+                path => NormalizeRelativePath(cachedApp, path),
+                path => new FileInfo(path),
+                StringComparer.OrdinalIgnoreCase);
+        if (sourceFiles.Count == 0 ||
+            sourceFiles.Count != cachedFiles.Count ||
+            sourceFiles.Keys.Any(relativePath => !cachedFiles.ContainsKey(relativePath)))
+        {
+            return false;
+        }
+
+        foreach (var (relativePath, sourceFile) in sourceFiles)
+        {
+            var cachedFile = cachedFiles[relativePath];
+            var managedOverride = allowManagedTrayIconOverrides &&
+                                  CompanyTrayIconBranding.IsManagedRelativePath(relativePath);
+            if (!managedOverride &&
+                (cachedFile.Length != sourceFile.Length ||
+                 !ComputeSha256(cachedFile.FullName).Equals(
+                     ComputeSha256(sourceFile.FullName),
+                     StringComparison.OrdinalIgnoreCase)))
             {
                 return false;
             }
@@ -321,6 +343,11 @@ public sealed class CodexRuntimeCache(LauncherPaths paths, LauncherLog log)
 
         return sourceFileCount > 0;
     }
+
+    private static string NormalizeRelativePath(string root, string filePath) =>
+        Path.GetRelativePath(root, filePath).Replace(
+            Path.AltDirectorySeparatorChar,
+            Path.DirectorySeparatorChar);
 
     private static string ComputeSha256(string filePath)
     {

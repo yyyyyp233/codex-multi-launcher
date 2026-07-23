@@ -106,8 +106,6 @@ public sealed class WorkProfileManagerTests
         File.WriteAllText(state, "existing-sqlite");
         File.WriteAllText(globalState, """{"selected-project":{"type":"local"}}""");
         File.WriteAllText(electronState, """{"existing-window-state":true}""");
-        var before = FingerprintDirectory(profileRoot);
-
         var registration = fixture.Manager.Configure(new ProfileSetupRequest(
             ProfileSetupMode.Attach,
             "公司空间",
@@ -115,12 +113,19 @@ public sealed class WorkProfileManagerTests
 
         Assert.Equal("taishi", registration.ProfileDirectoryName);
         Assert.Equal(home, fixture.Paths.CompanyCodexHome);
-        Assert.Equal(before, FingerprintDirectory(profileRoot));
         Assert.Equal(2, fixture.Manager.GetProfiles().Count);
         Assert.True(File.Exists(session));
         Assert.True(File.Exists(state));
         Assert.True(File.Exists(globalState));
         Assert.True(File.Exists(electronState));
+        using (var marker = JsonDocument.Parse(File.ReadAllText(
+                   Path.Combine(home, "launcher-profile-v2.json"))))
+        {
+            Assert.Equal(
+                registration.ProfileId,
+                marker.RootElement.GetProperty("ProfileId").GetString());
+        }
+
         Assert.False(Directory.Exists(Path.Combine(fixture.Paths.ProfilesRoot, "work-2")));
     }
 
@@ -151,21 +156,27 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
-    public void UniqueLegacyMarkerIsMigratedInPlaceWithoutRewritingProfileFiles()
+    public void UniqueLegacyMarkerPersistsStableIdentityWithoutRewritingUserConfiguration()
     {
         using var fixture = new TestFixture();
         var home = fixture.CreateLegacyCandidate("legacy-one", "legacy-key");
         var configBefore = HashFile(Path.Combine(home, "config.toml"));
         var authBefore = HashFile(Path.Combine(home, "auth.json"));
-        var markerBefore = HashFile(Path.Combine(home, "launcher-profile-v2.json"));
-
         var status = fixture.Manager.GetSetupStatus();
 
         Assert.Equal(WorkProfileSetupState.Configured, status.State);
         Assert.Equal("legacy-one", status.Registration?.ProfileDirectoryName);
         Assert.Equal(configBefore, HashFile(Path.Combine(home, "config.toml")));
         Assert.Equal(authBefore, HashFile(Path.Combine(home, "auth.json")));
-        Assert.Equal(markerBefore, HashFile(Path.Combine(home, "launcher-profile-v2.json")));
+        using (var marker = JsonDocument.Parse(File.ReadAllText(
+                   Path.Combine(home, "launcher-profile-v2.json"))))
+        {
+            Assert.Equal(5, marker.RootElement.GetProperty("SchemaVersion").GetInt32());
+            Assert.Equal(
+                status.Registration?.ProfileId,
+                marker.RootElement.GetProperty("ProfileId").GetString());
+        }
+
         Assert.True(File.Exists(fixture.Paths.ProfilesRegistryFile));
         Assert.False(File.Exists(fixture.Paths.WorkProfileRegistrationFile));
     }
@@ -255,6 +266,41 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
+    public void UpdateRollsBackEveryFileWhenALaterAuthMutationFails()
+    {
+        using var fixture = new TestFixture();
+        var registration = fixture.Manager.Configure(fixture.CreateRequest("original-key"));
+        var before = new[]
+        {
+            fixture.Paths.CompanyConfig,
+            fixture.Paths.CompanyAuth,
+            fixture.Paths.CompanyProfileMarker,
+            fixture.Paths.ProfilesRegistryFile
+        }.ToDictionary(path => path, HashFile, StringComparer.OrdinalIgnoreCase);
+
+        using (File.Open(
+                   fixture.Paths.CompanyAuth,
+                   FileMode.Open,
+                   FileAccess.Read,
+                   FileShare.Read))
+        {
+            Assert.ThrowsAny<IOException>(() => fixture.Manager.Configure(new ProfileSetupRequest(
+                ProfileSetupMode.Update,
+                "Should Not Commit",
+                ProfileId: registration.ProfileId,
+                AuthMode: ProfileAuthMode.ChatGptAccount)));
+        }
+
+        Assert.All(before, item => Assert.Equal(item.Value, HashFile(item.Key)));
+        Assert.Empty(Directory.EnumerateDirectories(
+            fixture.Paths.OperationStagingRoot,
+            "profile-update-*"));
+        Assert.Empty(Directory.EnumerateDirectories(
+            fixture.Paths.OperationStagingRoot,
+            "file-transaction-*"));
+    }
+
+    [Fact]
     public void CreatesArbitraryProfilesWithIndependentHomesAndStableDistinctColors()
     {
         using var fixture = new TestFixture();
@@ -333,6 +379,7 @@ public sealed class WorkProfileManagerTests
         var profileRoot = Path.Combine(fixture.Paths.ProfilesRoot, first.ProfileDirectoryName);
         var codexHome = Path.Combine(profileRoot, "codex-home");
         var session = Path.Combine(codexHome, "sessions", "retained-thread.jsonl");
+        var runtimeRoot = CreateRuntimeCache(fixture.Paths, first.ProfileId, "retained-cache");
         Directory.CreateDirectory(Path.GetDirectoryName(session)!);
         File.WriteAllText(session, """{"type":"retained-thread"}""");
 
@@ -344,11 +391,15 @@ public sealed class WorkProfileManagerTests
             ExistingCodexHome: codexHome));
 
         Assert.Equal("work", reattached.ProfileDirectoryName);
+        Assert.Equal(first.ProfileId, reattached.ProfileId);
         Assert.Equal(first.AccentColor, reattached.AccentColor);
         Assert.Equal(codexHome, fixture.Paths.CompanyCodexHome);
         Assert.Equal(before, FingerprintDirectory(profileRoot));
         Assert.Equal(2, fixture.Manager.GetProfiles().Count);
         Assert.False(Directory.Exists(Path.Combine(fixture.Paths.ProfilesRoot, "work-3")));
+
+        fixture.Manager.Delete(reattached.ProfileId, deleteLocalContent: true);
+        Assert.False(Directory.Exists(runtimeRoot));
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -39,7 +40,10 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
 
     public SnapshotSummary CreatePersonalSnapshot(string reason) => CreateSnapshotCore(reason, "personal");
 
-    private SnapshotSummary CreateSnapshotCore(string reason, string target)
+    private SnapshotSummary CreateSnapshotCore(
+        string reason,
+        string target,
+        string? protectedArchivePath = null)
     {
         paths.EnsureRuntimeDirectories();
         target = NormalizeTarget(target);
@@ -57,32 +61,53 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
         var skillsPath = companyTarget ? paths.CompanySkills : paths.PersonalSkills;
         var memoriesPath = companyTarget ? paths.CompanyMemories : paths.PersonalMemories;
 
-        using (var file = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
-        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false, Encoding.UTF8))
+        try
         {
-            AddFile(archive, configPath, "profile/config.toml", records);
-            AddFile(archive, agentsPath, "profile/AGENTS.md", records);
-            AddFile(archive, agentsOverridePath, "profile/AGENTS.override.md", records);
-            AddDirectory(archive, skillsPath, "profile/skills", records,
-                relative => !IsSystemSkill(relative));
-            AddDirectory(archive, memoriesPath, "profile/memories", records, _ => true);
+            using (var file = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.ReadWrite,
+                       FileShare.None))
+            using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false, Encoding.UTF8))
+            {
+                AddFile(archive, configPath, "profile/config.toml", records);
+                AddFile(archive, agentsPath, "profile/AGENTS.md", records);
+                AddFile(archive, agentsOverridePath, "profile/AGENTS.override.md", records);
+                AddDirectory(archive, skillsPath, "profile/skills", records,
+                    relative => !IsSystemSkill(relative));
+                AddDirectory(archive, memoriesPath, "profile/memories", records, _ => true);
 
-            var manifest = new ProfileSnapshotManifest(
-                id,
-                now,
-                reason,
-                companyTarget && File.Exists(configPath),
-                File.Exists(agentsPath),
-                records,
-                target,
-                true);
-            var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
-            using var writer = new StreamWriter(manifestEntry.Open(), new UTF8Encoding(false));
-            writer.Write(JsonSerializer.Serialize(manifest, JsonOptions));
+                var manifest = new ProfileSnapshotManifest(
+                    id,
+                    now,
+                    reason,
+                    companyTarget && File.Exists(configPath),
+                    File.Exists(agentsPath),
+                    records,
+                    target,
+                    true);
+                var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.Optimal);
+                using var writer = new StreamWriter(manifestEntry.Open(), new UTF8Encoding(false));
+                writer.Write(JsonSerializer.Serialize(manifest, JsonOptions));
+            }
+
+            File.Move(temporaryPath, finalPath, false);
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(temporaryPath);
+            }
+            catch
+            {
+                // Preserve the snapshot creation exception; a stale .tmp is never restorable.
+            }
+
+            throw;
         }
 
-        File.Move(temporaryPath, finalPath, false);
-        PruneOldSnapshots();
+        PruneOldSnapshots(protectedArchivePath);
         return ToSummary(finalPath, ReadManifest(finalPath));
     }
 
@@ -113,14 +138,46 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
         var target = NormalizeTarget(manifest.Target);
         var companyTarget = target == "company";
         var safetySnapshot = companyTarget
-            ? CreateSnapshot("before-restore")
-            : CreatePersonalSnapshot("before-restore");
+            ? CreateSnapshotCore("before-restore", "company", fullArchivePath)
+            : CreateSnapshotCore("before-restore", "personal", fullArchivePath);
+        try
+        {
+            ApplySnapshot(fullArchivePath, manifest);
+            return safetySnapshot;
+        }
+        catch (Exception restoreException)
+        {
+            try
+            {
+                ApplySnapshot(
+                    safetySnapshot.ArchivePath,
+                    ReadManifest(safetySnapshot.ArchivePath));
+            }
+            catch (Exception rollbackException)
+            {
+                throw new AggregateException(
+                    $"快照恢复失败且自动回滚不完整；安全快照：{safetySnapshot.ArchivePath}",
+                    restoreException,
+                    rollbackException);
+            }
+
+            ExceptionDispatchInfo.Capture(restoreException).Throw();
+            throw;
+        }
+    }
+
+    private void ApplySnapshot(
+        string archivePath,
+        ProfileSnapshotManifest manifest)
+    {
+        var target = NormalizeTarget(manifest.Target);
+        var companyTarget = target == "company";
         var stagingRoot = Path.Combine(paths.OperationStagingRoot, "restore-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(stagingRoot);
 
         try
         {
-            ExtractAndValidate(fullArchivePath, stagingRoot, manifest);
+            ExtractAndValidate(archivePath, stagingRoot, manifest);
             var stagedProfile = Path.Combine(stagingRoot, "profile");
             RestoreManagedSkills(
                 Path.Combine(stagedProfile, "skills"),
@@ -139,11 +196,19 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
             {
                 if (manifest.HasConfig)
                 {
-                    AtomicCopy(Path.Combine(stagedProfile, "config.toml"), paths.CompanyConfig);
+                    AtomicCopyIfChanged(Path.Combine(stagedProfile, "config.toml"), paths.CompanyConfig);
+                }
+                else if (File.Exists(paths.CompanyConfig))
+                {
+                    if ((File.GetAttributes(paths.CompanyConfig) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        throw new InvalidOperationException(
+                            "工作空间配置目标是链接或重解析点，已拒绝恢复。");
+                    }
+
+                    File.Delete(paths.CompanyConfig);
                 }
             }
-
-            return safetySnapshot;
         }
         finally
         {
@@ -179,7 +244,7 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
         var targetAgents = Path.Combine(targetHome, "AGENTS.md");
         if (manifest.HasAgents)
         {
-            AtomicCopy(stagedAgents, targetAgents);
+            AtomicCopyIfChanged(stagedAgents, targetAgents);
         }
         else if (File.Exists(targetAgents))
         {
@@ -203,7 +268,7 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
 
         if (File.Exists(staged))
         {
-            AtomicCopy(staged, target);
+            AtomicCopyIfChanged(staged, target);
         }
         else if (File.Exists(target))
         {
@@ -488,11 +553,27 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
         return fullArchivePath;
     }
 
-    private void PruneOldSnapshots()
+    private void PruneOldSnapshots(string? protectedArchivePath = null)
     {
-        foreach (var archive in Directory.EnumerateFiles(paths.SnapshotDirectory, "*.zip")
-                     .OrderByDescending(File.GetLastWriteTimeUtc)
-                     .Skip(RetentionCount))
+        var ordered = Directory.EnumerateFiles(paths.SnapshotDirectory, "*.zip")
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .ToArray();
+        var protectedFullPath = protectedArchivePath is null
+            ? null
+            : Path.GetFullPath(protectedArchivePath);
+        var retained = ordered
+            .Where(path => protectedFullPath is null ||
+                           !Path.GetFullPath(path).Equals(
+                               protectedFullPath,
+                               StringComparison.OrdinalIgnoreCase))
+            .Take(protectedFullPath is null ? RetentionCount : RetentionCount - 1)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (protectedFullPath is not null)
+        {
+            retained.Add(protectedFullPath);
+        }
+
+        foreach (var archive in ordered.Where(path => !retained.Contains(Path.GetFullPath(path))))
         {
             try
             {
@@ -520,15 +601,40 @@ public sealed class ProfileSnapshotService(LauncherPaths paths)
 
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         var temporary = destination + ".tmp-" + Guid.NewGuid().ToString("N");
-        using (var sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read,
-                   FileShare.ReadWrite | FileShare.Delete))
-        using (var targetStream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        try
         {
-            sourceStream.CopyTo(targetStream);
-            targetStream.Flush(true);
+            using (var sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read,
+                       FileShare.ReadWrite | FileShare.Delete))
+            using (var targetStream = new FileStream(
+                       temporary,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                sourceStream.CopyTo(targetStream);
+                targetStream.Flush(true);
+            }
+
+            File.Move(temporary, destination, true);
+        }
+        finally
+        {
+            File.Delete(temporary);
+        }
+    }
+
+    private static void AtomicCopyIfChanged(string source, string destination)
+    {
+        if (File.Exists(destination) &&
+            new FileInfo(source).Length == new FileInfo(destination).Length &&
+            ComputeSha256(source).Equals(
+                ComputeSha256(destination),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
         }
 
-        File.Move(temporary, destination, true);
+        AtomicCopy(source, destination);
     }
 
     internal static void CopyDirectory(string source, string destination)

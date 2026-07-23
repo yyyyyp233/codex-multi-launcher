@@ -7,12 +7,12 @@ public sealed class ProfileMergeService(
     CompanyProfileManager profileManager,
     ProfileSnapshotService snapshots)
 {
-    private const string OperationGateName = @"Local\CodexChannelLauncher.ConfigurationOperation";
     private MergeBaseStore BaseStore => new(paths.MergeBaseDirectory);
 
     public bool IsCompanyRunning()
     {
-        var registration = profileManager.GetProfiles().FirstOrDefault(profile =>
+        var profiles = profileManager.GetProfiles();
+        var registration = profiles.FirstOrDefault(profile =>
             profile.ProfileDirectoryName.Equals(
                 paths.WorkProfileDirectoryName,
                 StringComparison.OrdinalIgnoreCase));
@@ -22,13 +22,18 @@ public sealed class ProfileMergeService(
         }
 
         var state = new StateStore(paths).Load();
-        return state.ProfileRootProcesses is not null &&
-               state.ProfileRootProcesses.TryGetValue(registration.ProfileId, out var marker) &&
-               ProcessInventory.IsAlive(marker);
+        state.ProfileRootProcesses ??=
+            new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
+        state.ProfileRootProcesses.TryGetValue(registration.ProfileId, out var marker);
+        return ProcessInventory.IsProfileMutationBlocked(
+            paths,
+            registration.ProfileId,
+            marker,
+            profiles.Select(profile => profile.ProfileId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
     }
 
-    public bool IsPersonalRunning() => ProcessInventory.GetChatGptRoots()
-        .Any(process => !LauncherPaths.IsUnder(process.ExecutablePath, paths.RuntimeCacheRoot));
+    public bool IsPersonalRunning() => ProcessInventory.IsPersonalRunning(paths);
 
     public IReadOnlyList<MergeFileEntry> GetFiles(MergeResourceKind kind, string containerName)
     {
@@ -662,7 +667,7 @@ public sealed class ProfileMergeService(
             return new Dictionary<string, FileProbe>(StringComparer.OrdinalIgnoreCase);
         }
 
-        EnsureNoReparsePoint(root);
+        LauncherPaths.EnsureNoReparsePoints(root);
 
         if (kind == MergeResourceKind.GlobalRules)
         {
@@ -673,7 +678,7 @@ public sealed class ProfileMergeService(
                     item => item.Name,
                     item =>
                     {
-                        EnsureNoReparsePoint(item.Path);
+                        LauncherPaths.EnsureNoReparsePoints(item.Path);
                         return new FileProbe(
                             new FileInfo(item.Path).Length,
                             TextFileCodec.ComputeFingerprint(item.Path));
@@ -745,33 +750,8 @@ public sealed class ProfileMergeService(
             throw new InvalidOperationException("合并文件路径越界。");
         }
 
-        EnsureNoReparsePoint(fullPath);
+        LauncherPaths.EnsureNoReparsePoints(fullPath);
         return fullPath;
-    }
-
-    private static void EnsureNoReparsePoint(string path)
-    {
-        var fullPath = Path.GetFullPath(path);
-        var pathRoot = Path.GetPathRoot(fullPath) ??
-                       throw new InvalidOperationException("无法解析合并路径根目录。");
-        var current = pathRoot;
-        if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidOperationException("合并路径包含链接或重解析点，已拒绝访问。");
-        }
-
-        var relative = Path.GetRelativePath(pathRoot, fullPath);
-        foreach (var segment in relative.Split(
-                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
-                     StringSplitOptions.RemoveEmptyEntries))
-        {
-            current = Path.Combine(current, segment);
-            if ((File.Exists(current) || Directory.Exists(current)) &&
-                (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new InvalidOperationException("合并路径包含链接或重解析点，已拒绝访问。");
-            }
-        }
     }
 
     private static string ResolveChildDirectory(string root, string name)
@@ -827,33 +807,8 @@ public sealed class ProfileMergeService(
 
     private T WithOperationGate<T>(Func<T> action)
     {
-        using var mutex = new Mutex(false, OperationGateName);
-        var lockTaken = false;
-        try
-        {
-            try
-            {
-                lockTaken = mutex.WaitOne(TimeSpan.FromSeconds(45));
-            }
-            catch (AbandonedMutexException)
-            {
-                lockTaken = true;
-            }
-
-            if (!lockTaken)
-            {
-                throw new TimeoutException("另一个多开器窗口正在修改配置或双向数据。");
-            }
-
-            return action();
-        }
-        finally
-        {
-            if (lockTaken)
-            {
-                mutex.ReleaseMutex();
-            }
-        }
+        using var operationGate = LauncherOperationGate.Acquire(paths);
+        return action();
     }
 
     private static string BuildWarning(

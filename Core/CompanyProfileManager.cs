@@ -1232,7 +1232,8 @@ public sealed partial class CompanyProfileManager(
             if (!TryGetProperty(document.RootElement, "Authority", out var authorityProperty) ||
                 authorityProperty.ValueKind != JsonValueKind.String ||
                 authorityProperty.GetString() is not { } authority ||
-                !(authority.Equals("legacy-isolated-profile", StringComparison.OrdinalIgnoreCase) ||
+                !(authority.Equals("company-app-codex-home", StringComparison.OrdinalIgnoreCase) ||
+                  authority.Equals("legacy-isolated-profile", StringComparison.OrdinalIgnoreCase) ||
                   authority.Equals("isolated-work-profile", StringComparison.OrdinalIgnoreCase) ||
                   authority.Equals("isolated-managed-profile", StringComparison.OrdinalIgnoreCase)))
             {

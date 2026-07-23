@@ -34,6 +34,11 @@ public sealed partial class CompanyProfileManager(
         ProfileAuthMode AuthMode,
         string AccentColor);
 
+    private sealed record ExistingProfileBinding(
+        string ProfileDirectoryName,
+        string CodexHome,
+        string? AccentColor);
+
     private const int LegacyRegistrationSchemaVersion = 1;
     private const int RegistrySchemaVersion = 1;
     private const int MarkerSchemaVersion = 4;
@@ -192,12 +197,8 @@ public sealed partial class CompanyProfileManager(
         return request.Mode switch
         {
             ProfileSetupMode.Update => UpdateExisting(request, displayName, registry),
-            ProfileSetupMode.Create => CreateProfile(request, displayName, null, registry),
-            ProfileSetupMode.Import => CreateProfile(
-                request,
-                displayName,
-                ValidateImportSource(request.ImportSourceHome),
-                registry),
+            ProfileSetupMode.Create => CreateProfile(request, displayName, registry),
+            ProfileSetupMode.Attach => AttachExistingProfile(request, displayName, registry),
             _ => throw new ArgumentOutOfRangeException(nameof(request), "未知的隔离空间配置模式。")
         };
     }
@@ -465,26 +466,52 @@ public sealed partial class CompanyProfileManager(
         return updated;
     }
 
+    private ManagedProfileRegistration AttachExistingProfile(
+        ProfileSetupRequest request,
+        string displayName,
+        ManagedProfileRegistry registry)
+    {
+        var binding = ValidateExistingProfile(request.ExistingCodexHome);
+        if (registry.Profiles.Any(profile => profile.ProfileDirectoryName.Equals(
+                binding.ProfileDirectoryName,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("所选工作空间已经接入，无需重复添加。");
+        }
+
+        var authMode = InferAuthMode(
+            Path.Combine(binding.CodexHome, "config.toml"),
+            Path.Combine(binding.CodexHome, "auth.json"));
+        var accentColor = IsValidAccentColor(binding.AccentColor) &&
+                          registry.Profiles.All(profile => !profile.AccentColor.Equals(
+                              binding.AccentColor,
+                              StringComparison.OrdinalIgnoreCase))
+            ? binding.AccentColor!
+            : AllocateAccentColor(registry.Profiles);
+        var registration = NewRegistration(
+            binding.ProfileDirectoryName,
+            displayName,
+            authMode,
+            accentColor);
+        _ = ReadMetadataCore(
+            Path.Combine(binding.CodexHome, "config.toml"),
+            Path.Combine(binding.CodexHome, "auth.json"),
+            registration);
+
+        WriteRegistry(registry with { Profiles = [.. registry.Profiles, registration] });
+        paths.SelectWorkProfileDirectory(binding.ProfileDirectoryName);
+        return registration;
+    }
+
     private ManagedProfileRegistration CreateProfile(
         ProfileSetupRequest request,
         string displayName,
-        string? importSource,
         ManagedProfileRegistry registry)
     {
-        ProviderSettings? settings = null;
         var authMode = request.AuthMode;
-        if (importSource is null)
-        {
-            settings = ValidateProviderSettings(
-                request,
-                requireApiKey: authMode != ProfileAuthMode.ChatGptAccount);
-        }
-        else
-        {
-            authMode = InferAuthMode(
-                Path.Combine(importSource, "config.toml"),
-                Path.Combine(importSource, "auth.json"));
-        }
+        var settings = ValidateProviderSettings(
+            request,
+            requireApiKey: authMode != ProfileAuthMode.ChatGptAccount);
 
         var directoryName = AllocateProfileDirectoryName(registry.Profiles);
         var accentColor = AllocateAccentColor(registry.Profiles);
@@ -494,27 +521,18 @@ public sealed partial class CompanyProfileManager(
             "profile-setup-" + Guid.NewGuid().ToString("N"));
         var stagedProfileRoot = Path.Combine(stagingRoot, directoryName);
         var stagedHome = Path.Combine(stagedProfileRoot, "codex-home");
-        var importedSkills = false;
-        var importedMemories = false;
         Directory.CreateDirectory(stagedHome);
 
         try
         {
-            if (importSource is null)
+            var document = ProfileConfigDocument.Create();
+            ApplyProfileSettings(document, authMode, settings);
+            document.SaveAtomic(Path.Combine(stagedHome, "config.toml"));
+            if (authMode != ProfileAuthMode.ChatGptAccount)
             {
-                var document = ProfileConfigDocument.Create();
-                ApplyProfileSettings(document, authMode, settings);
-                document.SaveAtomic(Path.Combine(stagedHome, "config.toml"));
-                if (authMode != ProfileAuthMode.ChatGptAccount)
-                {
-                    WriteApiKeyAtomic(
-                        Path.Combine(stagedHome, "auth.json"),
-                        ValidateApiKey(request.ApiKey));
-                }
-            }
-            else
-            {
-                (importedSkills, importedMemories) = CopyImportAllowlist(importSource, stagedHome);
+                WriteApiKeyAtomic(
+                    Path.Combine(stagedHome, "auth.json"),
+                    ValidateApiKey(request.ApiKey));
             }
 
             var registration = NewRegistration(directoryName, displayName, authMode, accentColor);
@@ -525,9 +543,9 @@ public sealed partial class CompanyProfileManager(
             WriteMarker(
                 Path.Combine(stagedHome, "launcher-profile-v2.json"),
                 displayName,
-                importSource is null ? "created" : "imported",
-                importedSkills,
-                importedMemories,
+                "created",
+                false,
+                false,
                 authMode,
                 accentColor);
 
@@ -557,7 +575,7 @@ public sealed partial class CompanyProfileManager(
 
             try
             {
-                snapshots.CreateSnapshot(importSource is null ? "profile-created" : "profile-imported");
+                snapshots.CreateSnapshot("profile-created");
             }
             catch
             {
@@ -979,124 +997,78 @@ public sealed partial class CompanyProfileManager(
         document.SetBool(section, "requires_openai_auth", true);
     }
 
-    private (bool ImportedSkills, bool ImportedMemories) CopyImportAllowlist(
-        string sourceHome,
-        string destinationHome)
+    private ExistingProfileBinding ValidateExistingProfile(string? selectedPath)
     {
-        ProfileSnapshotService.AtomicCopy(
-            Path.Combine(sourceHome, "config.toml"),
-            Path.Combine(destinationHome, "config.toml"));
-        var sourceAuth = Path.Combine(sourceHome, "auth.json");
-        if (File.Exists(sourceAuth))
+        if (string.IsNullOrWhiteSpace(selectedPath))
         {
-            ProfileSnapshotService.AtomicCopy(sourceAuth, Path.Combine(destinationHome, "auth.json"));
+            throw new ArgumentException("请选择已有工作空间目录或 Codex Home。", nameof(selectedPath));
         }
 
-        foreach (var fileName in ProfileContentPolicy.GlobalRuleFileNames)
+        var selected = Path.GetFullPath(
+            Environment.ExpandEnvironmentVariables(selectedPath.Trim().Trim('"')));
+        if (!Directory.Exists(selected))
         {
-            var source = Path.Combine(sourceHome, fileName);
-            if (File.Exists(source) &&
-                (File.GetAttributes(source) & FileAttributes.ReparsePoint) == 0)
-            {
-                ProfileSnapshotService.AtomicCopy(source, Path.Combine(destinationHome, fileName));
-            }
+            throw new DirectoryNotFoundException("所选工作空间目录不存在。");
         }
 
-        var importedSkills = CopyFilteredDirectory(
-            Path.Combine(sourceHome, "skills"),
-            Path.Combine(destinationHome, "skills"),
-            relativePath =>
-            {
-                var first = relativePath.Split('\\', '/')[0];
-                return !first.Equals(".system", StringComparison.OrdinalIgnoreCase) &&
-                       IsPortableFile(relativePath);
-            });
-        var importedMemories = CopyFilteredDirectory(
-            Path.Combine(sourceHome, "memories"),
-            Path.Combine(destinationHome, "memories"),
-            relativePath => ProfileContentPolicy.IsManagedMemoryPath(relativePath) &&
-                            IsPortableFile(relativePath));
-        return (importedSkills, importedMemories);
-    }
-
-    private static bool CopyFilteredDirectory(
-        string sourceRoot,
-        string destinationRoot,
-        Func<string, bool> include)
-    {
-        if (!Directory.Exists(sourceRoot))
+        if ((File.GetAttributes(selected) & FileAttributes.ReparsePoint) != 0)
         {
-            return false;
+            throw new InvalidOperationException("不能接入链接或重解析点目录。");
         }
 
-        var copied = false;
-        var options = new EnumerationOptions
+        var directConfig = Path.Combine(selected, "config.toml");
+        var nestedHome = Path.Combine(selected, "codex-home");
+        var codexHome = File.Exists(directConfig)
+            ? selected
+            : File.Exists(Path.Combine(nestedHome, "config.toml"))
+                ? nestedHome
+                : throw new InvalidDataException("所选目录不是有效工作空间：缺少 codex-home/config.toml。");
+        var homeInfo = new DirectoryInfo(codexHome);
+        var profileRoot = homeInfo.Parent;
+        if (!homeInfo.Name.Equals("codex-home", StringComparison.OrdinalIgnoreCase) ||
+            profileRoot?.Parent is null ||
+            !PathsEqual(profileRoot.Parent.FullName, paths.ProfilesRoot) ||
+            !LauncherPaths.IsSafeProfileDirectoryName(profileRoot.Name))
         {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = false,
-            AttributesToSkip = FileAttributes.ReparsePoint
-        };
-        foreach (var sourceFile in Directory.EnumerateFiles(sourceRoot, "*", options))
-        {
-            var relative = Path.GetRelativePath(sourceRoot, sourceFile);
-            if (!include(relative))
-            {
-                continue;
-            }
-
-            var destination = Path.GetFullPath(Path.Combine(destinationRoot, relative));
-            if (!LauncherPaths.IsUnder(destination, destinationRoot))
-            {
-                throw new InvalidDataException("导入内容包含越界路径，已拒绝导入。");
-            }
-
-            ProfileSnapshotService.AtomicCopy(sourceFile, destination);
-            copied = true;
+            throw new InvalidOperationException(
+                "只能原地接入多开器本地 profiles 目录下保留的工作空间；个人或外部 Codex Home 不会被绑定。");
         }
 
-        return copied;
-    }
-
-    private string ValidateImportSource(string? sourceHome)
-    {
-        if (string.IsNullOrWhiteSpace(sourceHome))
+        if ((File.GetAttributes(profileRoot.FullName) & FileAttributes.ReparsePoint) != 0 ||
+            (File.GetAttributes(codexHome) & FileAttributes.ReparsePoint) != 0)
         {
-            throw new ArgumentException("请选择要导入的 Codex Home。", nameof(sourceHome));
+            throw new InvalidOperationException("工作空间根目录或 Codex Home 是链接，已拒绝接入。");
         }
 
-        var fullPath = Path.GetFullPath(
-            Environment.ExpandEnvironmentVariables(sourceHome.Trim().Trim('"')));
-        if (!Directory.Exists(fullPath))
+        var configPath = Path.Combine(codexHome, "config.toml");
+        if ((File.GetAttributes(configPath) & FileAttributes.ReparsePoint) != 0)
         {
-            throw new DirectoryNotFoundException("要导入的 Codex Home 不存在。");
+            throw new InvalidDataException("工作空间 config.toml 不能是链接或重解析点。");
         }
 
-        if ((File.GetAttributes(fullPath) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidOperationException("不能从链接或重解析点导入 Codex Home。");
-        }
-
-        var configPath = Path.Combine(fullPath, "config.toml");
-        if (!File.Exists(configPath) ||
-            (File.GetAttributes(configPath) & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidDataException("导入源缺少常规文件：config.toml");
-        }
-
-        var authPath = Path.Combine(fullPath, "auth.json");
+        var authPath = Path.Combine(codexHome, "auth.json");
         if (File.Exists(authPath) &&
             (File.GetAttributes(authPath) & FileAttributes.ReparsePoint) != 0)
         {
-            throw new InvalidDataException("导入源 auth.json 不能是链接或重解析点。");
+            throw new InvalidDataException("工作空间 auth.json 不能是链接或重解析点。");
         }
 
-        if (LauncherPaths.IsUnder(fullPath, paths.OperationStagingRoot) ||
-            LauncherPaths.IsUnder(fullPath, paths.RuntimeCacheRoot))
+        var markerPath = Path.Combine(codexHome, "launcher-profile-v2.json");
+        if ((File.Exists(markerPath) &&
+             (File.GetAttributes(markerPath) & FileAttributes.ReparsePoint) != 0) ||
+            !TryReadMarker(markerPath, out _, out var markerColor))
         {
-            throw new InvalidOperationException("不能从启动器临时目录或运行副本导入配置。");
+            throw new InvalidDataException("所选目录缺少有效的多开器工作空间标记，无法安全接入。");
         }
 
-        return fullPath;
+        var electronData = Path.Combine(profileRoot.FullName, "electron");
+        if (Directory.Exists(electronData) &&
+            (File.GetAttributes(electronData) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException("工作空间 Electron 数据目录是链接，已拒绝接入。");
+        }
+
+        return new ExistingProfileBinding(profileRoot.Name, codexHome, markerColor);
     }
 
     private string AllocateProfileDirectoryName(IEnumerable<ManagedProfileRegistration> profiles)
@@ -1341,15 +1313,11 @@ public sealed partial class CompanyProfileManager(
     private static bool IsValidAccentColor(string? value) =>
         value is not null && AccentColorRegex().IsMatch(value);
 
-    private static bool IsPortableFile(string relativePath)
-    {
-        var fileName = Path.GetFileName(relativePath);
-        return !fileName.Equals("auth.json", StringComparison.OrdinalIgnoreCase) &&
-               !fileName.Equals(".env", StringComparison.OrdinalIgnoreCase) &&
-               !fileName.StartsWith(".env.", StringComparison.OrdinalIgnoreCase) &&
-               !fileName.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase) &&
-               !fileName.EndsWith(".snk", StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool PathsEqual(string left, string right) =>
+        string.Equals(
+            Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
 
     private static void WriteApiKeyAtomic(string destination, string apiKey)
     {

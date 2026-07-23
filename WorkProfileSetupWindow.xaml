@@ -103,7 +103,7 @@
                                 <ComboBox x:Name="ModeBox" Style="{StaticResource InputComboBox}"
                                           SelectionChanged="ModeBox_SelectionChanged">
                                     <ComboBoxItem Content="新建工作空间" Tag="Create" IsSelected="True" />
-                                    <ComboBoxItem Content="导入已有 Codex Home" Tag="Import" />
+                                    <ComboBoxItem Content="使用已有工作空间" Tag="Attach" />
                                 </ComboBox>
                             </StackPanel>
                             <StackPanel Grid.Column="2">
@@ -124,19 +124,25 @@
                             </StackPanel>
                         </Border>
 
-                        <Grid x:Name="ImportPanel" Visibility="Collapsed" Margin="0,0,0,15">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                        <Border x:Name="AttachPanel" Visibility="Collapsed"
+                                Style="{StaticResource SectionCard}" Margin="0,0,0,15">
                             <StackPanel>
-                                <TextBlock Text="已有 Codex Home" Style="{StaticResource FieldLabel}" />
-                                <TextBox x:Name="ImportPathBox" Style="{StaticResource InputTextBox}" />
+                                <TextBlock Text="已有工作空间目录 / Codex Home" Style="{StaticResource FieldLabel}" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="ExistingPathBox" Style="{StaticResource InputTextBox}" />
+                                    <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Height="40"
+                                            Content="浏览…" Click="BrowseExistingButton_Click" />
+                                </Grid>
+                                <TextBlock Margin="0,9,0,0" Foreground="#7F8AA3" FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Text="原地接入，不复制任何配置、对话、数据库或界面状态。仅支持多开器本地 profiles 目录中保留的工作空间。" />
                             </StackPanel>
-                            <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Height="40"
-                                    VerticalAlignment="Bottom" Content="浏览…" Click="BrowseImportButton_Click" />
-                        </Grid>
+                        </Border>
 
                         <StackPanel x:Name="ProviderPanel">
                             <Border x:Name="CustomProviderPanel" Style="{StaticResource SectionCard}">

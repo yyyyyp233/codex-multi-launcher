@@ -127,7 +127,7 @@ public partial class ConfigurationCenterWindow : Window
         }
 
         var confirmation = await ConfirmAsync(
-            $"“{profileRegistration.DisplayName}”将从多开器中移除。默认会保留全部本地数据，以便之后重新导入。",
+            $"“{profileRegistration.DisplayName}”将从多开器中移除。默认会保留全部本地数据，以便之后原地重新接入。",
             "删除工作空间",
             "删除工作空间",
             showDeleteLocalOption: true,

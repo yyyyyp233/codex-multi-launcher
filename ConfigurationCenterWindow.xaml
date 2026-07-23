@@ -24,35 +24,47 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
-        <SolidColorBrush x:Key="PanelBrush" Color="#E8141924" />
-        <SolidColorBrush x:Key="PanelStrokeBrush" Color="#30384B" />
         <Style x:Key="SectionTitle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
-            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontSize" Value="17" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="#F0F2F8" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         </Style>
 
         <Style x:Key="HintText" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11" />
-            <Setter Property="Foreground" Value="#8792A8" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="LineHeight" Value="17" />
         </Style>
 
         <Style x:Key="ConfigListBox" TargetType="ListBox">
-            <Setter Property="Background" Value="#8C0E131D" />
-            <Setter Property="BorderBrush" Value="#293143" />
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="5" />
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
         </Style>
 
+        <Style x:Key="ConfigFocusVisual" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Control">
+                        <Border BorderBrush="{StaticResource AccentBrightBrush}"
+                                BorderThickness="1.5"
+                                CornerRadius="12"
+                                Margin="-3" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ListBoxItem">
-            <Setter Property="Foreground" Value="#DDE2EC" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="Padding" Value="11,9" />
             <Setter Property="Margin" Value="2" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ConfigFocusVisual}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -66,11 +78,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#171D2A" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource Surface2Brush}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#28223F" />
-                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#5B4E8B" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource OrangeSoftBrush}" />
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -78,13 +90,21 @@
             </Setter>
         </Style>
 
+        <Style TargetType="TabControl">
+            <Setter Property="TabStripPlacement" Value="Left" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+
         <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="#929CB1" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="15,9" />
+            <Setter Property="Width" Value="172" />
+            <Setter Property="Padding" Value="14,11" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource ConfigFocusVisual}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
@@ -92,17 +112,30 @@
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="10"
                                 Padding="{TemplateBinding Padding}"
-                                Margin="2,0">
-                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" />
+                                Margin="2,1">
+                            <Grid>
+                                <Border x:Name="TabAccent"
+                                        Width="3"
+                                        HorizontalAlignment="Left"
+                                        CornerRadius="2"
+                                        Background="{StaticResource AccentBrightBrush}"
+                                        Margin="2,6"
+                                        Opacity="0" />
+                                <ContentPresenter ContentSource="Header"
+                                                  Margin="8,0,0,0"
+                                                  HorizontalAlignment="Left"
+                                                  VerticalAlignment="Center" />
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="TabChrome" Property="Background" Value="#171C28" />
-                                <Setter Property="Foreground" Value="#D9DEEA" />
+                                <Setter TargetName="TabChrome" Property="Background" Value="{StaticResource Surface2Brush}" />
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="TabChrome" Property="Background" Value="#2B2542" />
-                                <Setter Property="Foreground" Value="#D1C9FF" />
+                                <Setter TargetName="TabChrome" Property="Background" Value="{StaticResource OrangeSoftBrush}" />
+                                <Setter TargetName="TabAccent" Property="Opacity" Value="1" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrightBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -111,21 +144,21 @@
         </Style>
 
         <Style x:Key="PanelCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource PanelStrokeBrush}" />
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="CornerRadius" Value="14" />
             <Setter Property="Padding" Value="18" />
         </Style>
     </Window.Resources>
 
-    <Border CornerRadius="18" BorderBrush="#444C62" BorderThickness="1" Background="#0B0E16">
+    <Border CornerRadius="18" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1" Background="{StaticResource WindowBackgroundBrush}">
         <Grid x:Name="RootContent" Opacity="0" ClipToBounds="True">
             <Grid.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#111528" Offset="0" />
-                    <GradientStop Color="#0B0E16" Offset="0.48" />
-                    <GradientStop Color="#161020" Offset="1" />
+                    <GradientStop Color="#14100B" Offset="0" />
+                    <GradientStop Color="#090A0C" Offset="0.48" />
+                    <GradientStop Color="#100D0A" Offset="1" />
                 </LinearGradientBrush>
             </Grid.Background>
             <Grid.RowDefinitions>
@@ -135,7 +168,7 @@
                 <RowDefinition Height="54" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" BorderBrush="#232A3B" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,0,0,1">
                 <Grid Margin="20,0,13,0" Background="Transparent">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -145,18 +178,18 @@
                     <Border Width="30" Height="30" CornerRadius="10" VerticalAlignment="Center">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#CBBFFF" Offset="0" />
-                                <GradientStop Color="#6F5BD7" Offset="1" />
+                                <GradientStop Color="#FFA14F" Offset="0" />
+                                <GradientStop Color="#D96A1B" Offset="1" />
                             </LinearGradientBrush>
                         </Border.Background>
-                        <TextBlock Text="⚙" Foreground="#11131B" FontSize="15"
+                        <TextBlock Text="⚙" Foreground="#14100B" FontSize="15"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="工作空间配置中心" FontFamily="{StaticResource DisplayFont}"
-                                   FontSize="15" FontWeight="SemiBold" />
+                                   FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="个人 / 工作空间隔离配置与显式双向合并" FontSize="10.5"
-                                   Foreground="#7D879D" Margin="0,2,0,0" />
+                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="2"
                                 Orientation="Horizontal"
@@ -169,7 +202,7 @@
             </Border>
 
             <Border Grid.Row="1" Margin="24,18,24,12" Padding="15,11" CornerRadius="14"
-                    Background="#B6131823" BorderBrush="#30384B" BorderThickness="1">
+                    Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -177,11 +210,15 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Ellipse x:Name="ProfileStateDot" Width="8" Height="8" Fill="#F3C777" VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="1" Margin="11,0,0,0">
+                    <StackPanel Grid.Column="1" Margin="11,0,0,0" VerticalAlignment="Center">
                         <TextBlock x:Name="ProfileStateText" Text="正在读取工作空间配置"
-                                   FontSize="12" FontWeight="SemiBold" />
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"
+                                   TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="ProfilePathText" Text="%LOCALAPPDATA%\CodexChannelLauncher"
-                                   FontFamily="Cascadia Mono, Consolas" FontSize="10" Foreground="#737E95" Margin="0,3,0,0" />
+                                   FontFamily="Cascadia Mono, Consolas" FontSize="10"
+                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,3,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button Style="{StaticResource SecondaryButton}" Height="36"
@@ -213,21 +250,21 @@
                             </Grid.ColumnDefinitions>
                             <Border Style="{StaticResource PanelCard}">
                                 <StackPanel>
-                                    <TextBlock Text="SKILLS" Foreground="#7F89A0" FontSize="10" FontWeight="Bold" />
+                                    <TextBlock Text="SKILLS" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
                                     <TextBlock x:Name="OverviewSkillCountText" Text="—" FontSize="25" FontWeight="SemiBold" Margin="0,7,0,0" />
                                     <TextBlock Text="支持个人 / 工作空间双向 Diff 与采用" Style="{StaticResource HintText}" Margin="0,6,0,0" />
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="2" Style="{StaticResource PanelCard}">
                                 <StackPanel>
-                                    <TextBlock Text="MCP SERVERS" Foreground="#7F89A0" FontSize="10" FontWeight="Bold" />
+                                    <TextBlock Text="MCP SERVERS" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
                                     <TextBlock x:Name="OverviewMcpCountText" Text="—" FontSize="25" FontWeight="SemiBold" Margin="0,7,0,0" />
                                     <TextBlock Text="密钥、静态 Header 与 OAuth 不迁移" Style="{StaticResource HintText}" Margin="0,6,0,0" />
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="4" Style="{StaticResource PanelCard}">
                                 <StackPanel>
-                                    <TextBlock Text="SNAPSHOTS" Foreground="#7F89A0" FontSize="10" FontWeight="Bold" />
+                                    <TextBlock Text="SNAPSHOTS" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="Bold" />
                                     <TextBlock x:Name="OverviewSnapshotCountText" Text="—" FontSize="25" FontWeight="SemiBold" Margin="0,7,0,0" />
                                     <TextBlock Text="每次变更前自动保存，最多保留十份" Style="{StaticResource HintText}" Margin="0,6,0,0" />
                                 </StackPanel>
@@ -281,25 +318,31 @@
                                             <ColumnDefinition Width="115" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12.5" />
-                                            <TextBlock Text="{Binding SizeText}" Foreground="#727D93" FontSize="10" Margin="0,4,0,0" />
-                                            <TextBlock Text="{Binding DiffText}" Foreground="#606B81" FontSize="9.5" Margin="0,3,0,0" />
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12.5"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                            <TextBlock Text="{Binding SizeText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" Margin="0,4,0,0"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding DiffText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="9.5" Margin="0,3,0,0"
+                                                       Opacity="0.75" TextTrimming="CharacterEllipsis" ToolTip="{Binding DiffText}" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="#AFA5F0"
-                                                   VerticalAlignment="Center" FontSize="11" />
+                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{StaticResource AccentBrightBrush}"
+                                                   VerticalAlignment="Center" FontSize="11"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
                                         <TextBlock Grid.Column="2" Text="{Binding CompanyEnabled, StringFormat=工作空间启用：{0}}"
-                                                   Foreground="#8792A8" VerticalAlignment="Center" FontSize="10.5" />
+                                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" FontSize="10.5"
+                                                   TextTrimming="CharacterEllipsis" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <Border Grid.Column="2" Style="{StaticResource PanelCard}">
-                            <StackPanel>
-                                <TextBlock Text="Skills 管理" Style="{StaticResource SectionTitle}" />
-                                <TextBlock Text="所选 Skill 按完整包双向采用：来源版本会替换目标版本。操作前必须退出两个 App，并自动快照目标侧。"
-                                           Style="{StaticResource HintText}" Margin="0,12,0,0" />
-                                <TextBlock x:Name="SelectedSkillText" Text="尚未选择 Skill" Margin="0,22,0,0"
-                                           FontSize="13" FontWeight="SemiBold" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="Skills 管理" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock Text="所选 Skill 按完整包双向采用：来源版本会替换目标版本。操作前必须退出两个 App，并自动快照目标侧。"
+                                               Style="{StaticResource HintText}" Margin="0,12,0,0" />
+                                    <TextBlock x:Name="SelectedSkillText" Text="尚未选择 Skill" Margin="0,22,0,0"
+                                               FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
                                 <Button x:Name="OpenSkillMergeWorkbenchButton" Style="{StaticResource PrimaryButton}" Height="42"
                                         Content="打开逐块 Diff / Merge" Margin="0,20,0,0" IsEnabled="False"
                                         Click="OpenSkillMergeWorkbenchButton_Click" />
@@ -314,7 +357,8 @@
                                         Click="ToggleSkillButton_Click" />
                                 <TextBlock Text=".system 与插件自带 Skills 不参与 Diff / Merge。启停配置只影响工作空间 App。"
                                            Style="{StaticResource HintText}" Margin="0,18,0,0" />
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                 </TabItem>
@@ -338,28 +382,32 @@
                                         <StackPanel>
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding FileName}" FontFamily="Cascadia Mono, Consolas"
-                                                           FontWeight="SemiBold" FontSize="12.5" />
-                                                <TextBlock Text="{Binding PriorityText}" Foreground="#8D82D2"
+                                                           FontWeight="SemiBold" FontSize="12.5"
+                                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding FileName}" />
+                                                <TextBlock Text="{Binding PriorityText}" Foreground="{StaticResource AccentBrush}"
                                                            FontSize="9.5" Margin="10,2,0,0" />
                                             </StackPanel>
-                                            <TextBlock Text="{Binding SizeText}" Foreground="#727D93"
-                                                       FontSize="10" Margin="0,5,0,0" />
-                                            <TextBlock Text="{Binding EffectiveText}" Foreground="#606B81"
-                                                       FontSize="9.5" Margin="0,3,0,0" />
+                                            <TextBlock Text="{Binding SizeText}" Foreground="{StaticResource TextSecondaryBrush}"
+                                                       FontSize="10" Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding EffectiveText}" Foreground="{StaticResource TextSecondaryBrush}"
+                                                       FontSize="9.5" Margin="0,3,0,0" Opacity="0.75"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding EffectiveText}" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="#AFA5F0"
-                                                   VerticalAlignment="Center" FontSize="11" />
+                                        <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{StaticResource AccentBrightBrush}"
+                                                   VerticalAlignment="Center" FontSize="11"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <Border Grid.Column="2" Style="{StaticResource PanelCard}">
-                            <StackPanel>
-                                <TextBlock Text="全局规则管理" Style="{StaticResource SectionTitle}" />
-                                <TextBlock Text="只管理两个 CODEX_HOME 根文件：非空 AGENTS.override.md 优先；否则使用 AGENTS.md。项目目录与外部路由文件不在此处修改。"
-                                           Style="{StaticResource HintText}" Margin="0,12,0,0" />
-                                <TextBlock x:Name="SelectedGlobalRuleText" Text="尚未选择规则文件"
-                                           Margin="0,22,0,0" FontSize="13" FontWeight="SemiBold" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="全局规则管理" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock Text="只管理两个 CODEX_HOME 根文件：非空 AGENTS.override.md 优先；否则使用 AGENTS.md。项目目录与外部路由文件不在此处修改。"
+                                               Style="{StaticResource HintText}" Margin="0,12,0,0" />
+                                    <TextBlock x:Name="SelectedGlobalRuleText" Text="尚未选择规则文件"
+                                               Margin="0,22,0,0" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
                                 <Button x:Name="OpenGlobalRuleMergeWorkbenchButton"
                                         Style="{StaticResource PrimaryButton}" Height="42"
                                         Content="打开逐块 Diff / Merge" Margin="0,20,0,0" IsEnabled="False"
@@ -374,7 +422,8 @@
                                         Click="MergeGlobalRuleToPersonalButton_Click" />
                                 <TextBlock Text="逐块保存或整文件采用前必须退出两个 App，并自动快照目标侧。规则会在重新启动或新建任务后重新发现。"
                                            Style="{StaticResource HintText}" Margin="0,18,0,0" />
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                 </TabItem>
@@ -387,13 +436,14 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Border Style="{StaticResource PanelCard}">
-                            <StackPanel>
-                                <TextBlock Text="快速合并 / 同步" Style="{StaticResource SectionTitle}" />
-                                <TextBlock x:Name="MemoryStatusText" Text="正在计算文件清单" Margin="0,15,0,0" FontSize="13" />
-                                <TextBlock x:Name="MemorySizeText" Text="—" Style="{StaticResource HintText}" Margin="0,7,0,0" />
-                                <TextBlock x:Name="MemoryDiffText" Text="—" Style="{StaticResource HintText}" Margin="0,5,0,0" />
-                                <Border Margin="0,20,0,0" Padding="13" CornerRadius="12" Background="#161B27"
-                                        BorderBrush="#30384B" BorderThickness="1">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="快速合并 / 同步" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock x:Name="MemoryStatusText" Text="正在计算文件清单" Margin="0,15,0,0" FontSize="13" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="MemorySizeText" Text="—" Style="{StaticResource HintText}" Margin="0,7,0,0" />
+                                    <TextBlock x:Name="MemoryDiffText" Text="—" Style="{StaticResource HintText}" Margin="0,5,0,0" />
+                                <Border Margin="0,20,0,0" Padding="13" CornerRadius="12" Background="{StaticResource Surface2Brush}"
+                                        BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1">
                                     <TextBlock Text="合并只处理可迁移记忆文件，排除 .git、.agents 与运行时临时文件。同路径冲突采用箭头左侧来源，目标侧独有文件保留；操作前必须退出两个 App。"
                                                Style="{StaticResource HintText}" />
                                 </Border>
@@ -403,11 +453,13 @@
                                 <Button x:Name="MergeMemoriesToPersonalButton" Style="{StaticResource SecondaryButton}"
                                         Height="42" Margin="0,10,0,0" IsEnabled="False"
                                         Content="工作空间 → 个人：合并 Memories" Click="MergeMemoriesToPersonalButton_Click" />
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
                         <Border Grid.Column="2" Style="{StaticResource PanelCard}">
-                            <StackPanel>
-                                <TextBlock Text="记忆策略" Style="{StaticResource SectionTitle}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="记忆策略" Style="{StaticResource SectionTitle}" />
                                 <Grid Margin="0,20,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="启用 Memories 功能" VerticalAlignment="Center" />
@@ -430,7 +482,8 @@
                                 </Grid>
                                 <Button Style="{StaticResource PrimaryButton}" Height="42" Margin="0,24,0,0"
                                         Content="保存记忆策略" Click="SaveMemorySettingsButton_Click" />
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                 </TabItem>
@@ -513,11 +566,14 @@
                                         <Grid>
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="110"/></Grid.ColumnDefinitions>
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                                <TextBlock Text="{Binding Transport}" Foreground="#727D93" FontSize="10" Margin="0,3,0,0" />
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                                                <TextBlock Text="{Binding Transport}" Foreground="{StaticResource TextSecondaryBrush}"
+                                                           FontSize="10" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="#AFA5F0"
-                                                       FontSize="10.5" VerticalAlignment="Center" TextAlignment="Right" />
+                                            <TextBlock Grid.Column="1" Text="{Binding StatusText}" Foreground="{StaticResource AccentBrightBrush}"
+                                                       FontSize="10.5" VerticalAlignment="Center" TextAlignment="Right"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -530,12 +586,13 @@
                             </Grid>
                         </Grid>
                         <Border Grid.Column="2" Style="{StaticResource PanelCard}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="MCP 配置" Style="{StaticResource SectionTitle}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="MCP 配置" Style="{StaticResource SectionTitle}" />
                                 <Grid Grid.Row="1" Margin="0,16,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="160"/></Grid.ColumnDefinitions>
                                     <StackPanel>
@@ -572,7 +629,8 @@
                                     <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Height="40"
                                             Content="保存 MCP" Click="SaveMcpButton_Click" />
                                 </Grid>
-                            </Grid>
+                                </Grid>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                 </TabItem>
@@ -581,8 +639,9 @@
                     <Grid Margin="4,15,4,4">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="360"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <Border Style="{StaticResource PanelCard}">
-                            <StackPanel>
-                                <TextBlock Text="快速预设" Style="{StaticResource SectionTitle}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="快速预设" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="预设只修改工作空间 App。个人权限不读取到编辑器，也不会被改动。"
                                            Style="{StaticResource HintText}" Margin="0,10,0,0" />
                                 <ComboBox x:Name="PermissionPresetBox" Style="{StaticResource InputComboBox}" Margin="0,22,0,0"
@@ -593,16 +652,18 @@
                                     <ComboBoxItem Content="自定义" Tag="custom" />
                                 </ComboBox>
                                 <Border x:Name="PermissionRiskBox" Margin="0,20,0,0" Padding="13,10" CornerRadius="11"
-                                        Background="#181D29" BorderBrush="#30384B" BorderThickness="1">
+                                        Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1">
                                     <TextBlock x:Name="PermissionRiskText" Text="选择预设后会显示风险说明。"
                                                Style="{StaticResource HintText}" />
                                 </Border>
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
                         <Border Grid.Column="2" Style="{StaticResource PanelCard}">
-                            <Grid>
-                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                <TextBlock Text="详细权限" Style="{StaticResource SectionTitle}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <TextBlock Text="详细权限" Style="{StaticResource SectionTitle}" />
                                 <Grid Grid.Row="1" Margin="0,18,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <StackPanel>
@@ -632,7 +693,8 @@
                                 </Grid>
                                 <Button Grid.Row="2" Style="{StaticResource PrimaryButton}" Height="42" Width="220"
                                         HorizontalAlignment="Right" Content="保存权限配置" Click="SavePermissionsButton_Click" />
-                            </Grid>
+                                </Grid>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                 </TabItem>
@@ -646,18 +708,21 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="130"/></Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding ArchivePath}" Foreground="#68738A" FontSize="9.5" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}" />
+                                            <TextBlock Text="{Binding ArchivePath}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="9.5" Margin="0,4,0,0"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding ArchivePath}" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding FileCount, StringFormat={}{0} files}" Foreground="#909AAF"
+                                        <TextBlock Grid.Column="1" Text="{Binding FileCount, StringFormat={}{0} files}" Foreground="{StaticResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center" TextAlignment="Right" />
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <Border Grid.Column="2" Style="{StaticResource PanelCard}">
-                            <StackPanel>
-                                <TextBlock Text="安全恢复" Style="{StaticResource SectionTitle}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="安全恢复" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="快照会标明个人或工作空间目标。工作空间快照含 config.toml、全局规则、用户 Skills 与 Memories；个人目标含全局规则、用户 Skills 与 Memories。始终排除 auth.json。"
                                            Style="{StaticResource HintText}" Margin="0,12,0,0" />
                                 <Button Style="{StaticResource PrimaryButton}" Height="42" Margin="0,22,0,0"
@@ -666,18 +731,22 @@
                                         Content="恢复所选快照" IsEnabled="False" Click="RestoreSnapshotButton_Click" />
                                 <Button Style="{StaticResource SecondaryButton}" Height="42" Margin="0,10,0,0"
                                         Content="打开快照目录" Click="OpenSnapshotFolderButton_Click" />
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                 </TabItem>
             </TabControl>
 
-            <Border Grid.Row="3" BorderBrush="#232A3B" BorderThickness="0,1,0,0" Background="#760B0E16">
+            <Border Grid.Row="3" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,1,0,0" Background="#C0090A0C">
                 <Grid Margin="24,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="10"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Ellipse x:Name="FooterStateDot" Width="7" Height="7" Fill="#68DEB1" />
-                        <TextBlock x:Name="FooterStatusText" Text="准备就绪" Margin="9,0,0,0" Foreground="#A7B0C1" FontSize="11" />
+                        <Ellipse x:Name="FooterStateDot" Width="7" Height="7" Fill="{StaticResource MintBrush}" />
+                        <TextBlock x:Name="FooterStatusText" Text="准备就绪" Margin="9,0,0,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
                     </StackPanel>
                     <Button Grid.Column="1" x:Name="RefreshButton" Style="{StaticResource SecondaryButton}" Height="36"
                             Content="刷新对比" Click="RefreshButton_Click" />
@@ -696,8 +765,8 @@
                         Padding="24"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Background="#111622"
-                        BorderBrush="#414A60"
+                        Background="{StaticResource Surface1Brush}"
+                        BorderBrush="{StaticResource StrokeBrush}"
                         BorderThickness="1"
                         CornerRadius="18">
                     <Border.Effect>
@@ -718,14 +787,14 @@
                                 <TextBlock x:Name="ConfirmTitleText" Text="确认操作"
                                            FontFamily="{StaticResource DisplayFont}"
                                            FontSize="18" FontWeight="SemiBold" />
-                                <TextBlock Text="此操作需要明确确认" Foreground="#7D879D"
+                                <TextBlock Text="此操作需要明确确认" Foreground="{StaticResource TextSecondaryBrush}"
                                            FontSize="10.5" Margin="0,3,0,0" />
                             </StackPanel>
                         </Grid>
 
                         <TextBlock x:Name="ConfirmBodyText"
                                    Margin="0,20,0,0"
-                                   Foreground="#C9CFDB"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
                                    FontSize="12"
                                    LineHeight="19"
                                    TextWrapping="Wrap" />

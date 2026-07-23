@@ -44,6 +44,25 @@ public partial class App : Application
                 return;
             }
 
+            if (TryReadOutputArgument(e.Args, "--render-merge-preview", out var mergePreviewOutput))
+            {
+                var mergeWindow = new MergeWorkbenchWindow(
+                    coordinator.MergeWorkbench,
+                    MergeResourceKind.GlobalRules,
+                    previewOutput: mergePreviewOutput);
+                MainWindow = mergeWindow;
+                mergeWindow.Show();
+                return;
+            }
+
+            if (TryReadOutputArgument(e.Args, "--render-setup-preview", out var setupPreviewOutput))
+            {
+                var setupWindow = new WorkProfileSetupWindow(coordinator, previewOutput: setupPreviewOutput);
+                MainWindow = setupWindow;
+                setupWindow.Show();
+                return;
+            }
+
             string? previewOutput = null;
             TryReadOutputArgument(e.Args, "--render-preview", out previewOutput);
 
@@ -63,7 +82,11 @@ public partial class App : Application
                 // Diagnostics must never hide the original startup failure.
             }
 
-            if (e.Args.Any(value => value.Equals("--render-config-preview", StringComparison.OrdinalIgnoreCase)))
+            if (e.Args.Any(value =>
+                    value.Equals("--render-preview", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("--render-config-preview", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("--render-merge-preview", StringComparison.OrdinalIgnoreCase) ||
+                    value.Equals("--render-setup-preview", StringComparison.OrdinalIgnoreCase)))
             {
                 Shutdown(1);
                 return;

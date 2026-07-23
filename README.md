@@ -1,7 +1,7 @@
 # Codex 多开器
 
 [![build-test](https://github.com/yyyyyp233/codex-multi-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/yyyyyp233/codex-multi-launcher/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-7b68ee.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F58A32.svg)](LICENSE)
 
 > **Unofficial community project.** A source-first Windows launcher that keeps the normal Codex App profile as the primary profile and can start any number of locally isolated profiles. Each managed profile can use a ChatGPT account, an OpenAI API key, or a third-party Responses-compatible provider. Requires Windows, the Codex Windows App, and .NET 10 SDK to build. It is not affiliated with or endorsed by OpenAI or Microsoft. The isolated launch path depends on an undocumented compatibility surface and locally prepares App runtime variants; read the [compatibility and terms notice](docs/COMPATIBILITY.md) before use. No binaries are distributed in this preview.
 
@@ -72,7 +72,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\audit-repository
 - **OpenAI API Key**：使用 Codex 内置 OpenAI Provider，只填写模型、推理等级与 Key；
 - **第三方 Responses Provider**：填写 Provider ID、名称、Base URL、模型、推理等级与 Key。
 
-每个新空间会分配并持久化一个未占用的主题色，卡片与托盘角标保持一致，重启后不会改变。
+启动器界面统一使用黑橙视觉；每个新空间仍会分配并持久化一个未占用的角标颜色，用于区分隔离 Codex App 的托盘图标，重启后不会改变。
 
 - Base URL 必须为 HTTPS；只有 `localhost`、`127.0.0.1`、`::1` 等回环地址允许 HTTP；
 - URL 内嵌用户名或密码、查询参数与片段会被拒绝；

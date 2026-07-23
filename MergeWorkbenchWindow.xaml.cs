@@ -13,6 +13,7 @@ public partial class MergeWorkbenchWindow : Window
     private readonly MergeResourceKind resourceKind;
     private readonly string containerName;
     private readonly string? initialRelativePath;
+    private readonly string? previewOutput;
     private IReadOnlyList<MergeBlockViewModel> allBlocks = [];
     private MergeDocument? document;
     private MergeFileEntry? currentEntry;
@@ -30,12 +31,14 @@ public partial class MergeWorkbenchWindow : Window
         ProfileMergeService service,
         MergeResourceKind resourceKind,
         string containerName = "",
-        string? initialRelativePath = null)
+        string? initialRelativePath = null,
+        string? previewOutput = null)
     {
         this.service = service;
         this.resourceKind = resourceKind;
         this.containerName = containerName;
         this.initialRelativePath = initialRelativePath;
+        this.previewOutput = string.IsNullOrWhiteSpace(previewOutput) ? null : previewOutput;
         InitializeComponent();
         ScopeText.Text = resourceKind switch
         {
@@ -46,8 +49,77 @@ public partial class MergeWorkbenchWindow : Window
         Loaded += MergeWorkbenchWindow_Loaded;
     }
 
-    private async void MergeWorkbenchWindow_Loaded(object sender, RoutedEventArgs e) =>
+    private async void MergeWorkbenchWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (previewOutput is not null)
+        {
+            PopulatePreviewState();
+            await Task.Delay(220);
+            WindowPreviewCapture.Save(this, previewOutput);
+            Close();
+            return;
+        }
+
         await RefreshFileListAsync(initialRelativePath);
+    }
+
+    private void PopulatePreviewState()
+    {
+        var files = new[]
+        {
+            new MergeFileEntry(
+                "AGENTS.md",
+                ComparisonState.Different,
+                true,
+                true,
+                2180,
+                2416,
+                true,
+                false),
+            new MergeFileEntry(
+                "skills/release/SKILL.md",
+                ComparisonState.PersonalOnly,
+                true,
+                false,
+                8640,
+                0,
+                false,
+                false)
+        };
+        var part = new TextMergePart(
+            0,
+            TextMergePartKind.Conflict,
+            ["- 保留共同基线规则"],
+            ["- 个人空间：提交前运行完整测试"],
+            ["- 工作空间：提交前运行安全审计"],
+            ["- 个人空间：提交前运行完整测试"]);
+        var block = new MergeBlockViewModel(part, true, () => { });
+
+        suppressSelection = true;
+        FileList.ItemsSource = files;
+        FileList.SelectedIndex = 0;
+        suppressSelection = false;
+        allBlocks = [block];
+        MergeBlockList.ItemsSource = allBlocks;
+        ScopeText.Text = "全局规则 · 逐块 Diff 与三方 Merge";
+        RuntimeDot.Fill = Brush("#65DFB2");
+        RuntimeText.Text = "个人与工作空间 App 均已退出";
+        FileCountText.Text = "2 个待处理文件";
+        SelectedPathText.Text = "AGENTS.md";
+        SelectedPathText.ToolTip = SelectedPathText.Text;
+        DocumentMetaText.Text = "UTF-8 · 个人 2.1 KB · 工作空间 2.4 KB · 有共同基线";
+        WarningBox.Visibility = Visibility.Visible;
+        WarningText.Text = "检测到双方修改：保存前需要明确处理未解决差异块。";
+        EmptySelectionText.Visibility = Visibility.Collapsed;
+        BinaryPanel.Visibility = Visibility.Collapsed;
+        TextMergePanel.Visibility = Visibility.Visible;
+        MergeSummaryText.Text = "1 个差异块 · 1 个需要人工处理";
+        ExistenceStateText.Text = "双方文件均存在";
+        FooterStatusText.Text = "预览数据 · 不读取或写入本机文件";
+        UnresolvedText.Text = "1 个未解决块";
+        TargetBox.SelectedIndex = 0;
+        SaveButton.IsEnabled = false;
+    }
 
     private void Window_SourceInitialized(object? sender, EventArgs e) => NativeAppearance.Apply(this);
 

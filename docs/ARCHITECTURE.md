@@ -18,6 +18,8 @@ Codex 多开器
 
 正常主窗口采用托盘驻留生命周期：标题栏关闭与 `Alt+F4` 取消窗口关闭并隐藏主窗口，托盘左键或“显示主窗口”恢复；托盘“退出多开器”、预览渲染完成以及 Windows 会话结束才允许真实关闭。托盘退出会先移除图标，再关闭窗口并结束 WPF Application，避免残留图标或后台进程。
 
+四个 WPF 窗口共用 `Themes/DarkTheme.xaml` 的黑橙视觉令牌、控件模板与键盘焦点样式。主窗口、配置中心、三方合并工作台和空间设置分别支持 `--render-preview`、`--render-config-preview`、`--render-merge-preview` 与 `--render-setup-preview`，由同一预览捕获器输出 PNG，用于无业务数据写入的视觉回归检查。
+
 ## Profile lifecycle
 
 运行状态分为：

@@ -23,28 +23,46 @@
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
         <Style x:Key="FieldLabel" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#C9CFDC" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,0,0,7" />
         </Style>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrightBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Margin" Value="0,0,0,3" />
+        </Style>
+        <Style x:Key="SectionDesc" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
         <Style x:Key="SectionCard" TargetType="Border">
             <Setter Property="CornerRadius" Value="13" />
-            <Setter Property="Background" Value="#121624" />
-            <Setter Property="BorderBrush" Value="#272F40" />
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="16,14" />
             <Setter Property="Margin" Value="0,0,0,15" />
         </Style>
     </Window.Resources>
 
-    <Border CornerRadius="18" BorderBrush="#2F3749" BorderThickness="1" Background="#0B0E16">
+    <Border CornerRadius="18" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+            Background="{StaticResource WindowBackgroundBrush}">
         <Grid ClipToBounds="True">
             <Grid.Background>
-                <RadialGradientBrush Center="0.78,0.15" GradientOrigin="0.78,0.15" RadiusX="0.9" RadiusY="0.9">
-                    <GradientStop Color="#332C50" Offset="0" />
-                    <GradientStop Color="#121525" Offset="0.38" />
-                    <GradientStop Color="#0B0E16" Offset="1" />
+                <RadialGradientBrush Center="0.82,0.08" GradientOrigin="0.82,0.08" RadiusX="1.1" RadiusY="1.1">
+                    <GradientStop Color="#1F130A" Offset="0" />
+                    <GradientStop Color="#0E0B08" Offset="0.42" />
+                    <GradientStop Color="#090A0C" Offset="1" />
                 </RadialGradientBrush>
             </Grid.Background>
             <Grid.RowDefinitions>
@@ -52,19 +70,21 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" BorderBrush="#252C3C" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,0,0,1">
                 <Grid Margin="20,0,14,0" Background="Transparent">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Border Width="27" Height="27" CornerRadius="9" VerticalAlignment="Center" Background="#8F7DEA">
-                        <TextBlock Text="✦" Foreground="#11131B" FontSize="13"
+                    <Border Width="27" Height="27" CornerRadius="9" VerticalAlignment="Center"
+                            Background="{StaticResource AccentBrush}">
+                        <TextBlock Text="✦" Foreground="#1A120A" FontSize="13"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Grid.Column="1" Text="工作空间配置" Margin="11,0,0,0"
-                               VerticalAlignment="Center" FontWeight="Bold" FontSize="12" Foreground="#D3D8E4" />
+                               VerticalAlignment="Center" FontWeight="Bold" FontSize="12"
+                               Foreground="{StaticResource TextPrimaryBrush}" />
                     <Button Grid.Column="2" Style="{StaticResource WindowButton}" Content="×"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="CloseButton_Click" />
                 </Grid>
@@ -82,14 +102,14 @@
                                FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="24" FontWeight="SemiBold" />
                     <TextBlock x:Name="SummaryText"
                                Text="认证仅写入本机隔离目录；不会修改个人 Codex Home。"
-                               Margin="0,7,0,0" Foreground="#96A0B4" FontSize="12" />
+                               Margin="0,7,0,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
                 </StackPanel>
 
                 <ScrollViewer Grid.Row="1" Margin="0,22,0,20" VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,0,10,0">
                         <Border x:Name="ProblemPanel" Visibility="Collapsed" Padding="13,10" Margin="0,0,0,14"
-                                CornerRadius="12" Background="#2A171C" BorderBrush="#68404A" BorderThickness="1">
-                            <TextBlock x:Name="ProblemText" Foreground="#F0ABB1" TextWrapping="Wrap" FontSize="11" />
+                                CornerRadius="12" Background="#26110D" BorderBrush="#6E3524" BorderThickness="1">
+                            <TextBlock x:Name="ProblemText" Foreground="#F0A68F" TextWrapping="Wrap" FontSize="11" />
                         </Border>
 
                         <Grid x:Name="ModePanel" Margin="0,0,0,15">
@@ -114,6 +134,9 @@
 
                         <Border x:Name="AuthenticationPanel" Style="{StaticResource SectionCard}">
                             <StackPanel>
+                                <TextBlock Text="认证" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Style="{StaticResource SectionDesc}"
+                                           Text="选择该工作空间连接 Codex 的凭据来源；凭据只保存在此隔离目录内。" />
                                 <TextBlock Text="认证方式" Style="{StaticResource FieldLabel}" />
                                 <ComboBox x:Name="AuthModeBox" Style="{StaticResource InputComboBox}"
                                           SelectionChanged="AuthModeBox_SelectionChanged">
@@ -127,6 +150,9 @@
                         <Border x:Name="AttachPanel" Visibility="Collapsed"
                                 Style="{StaticResource SectionCard}" Margin="0,0,0,15">
                             <StackPanel>
+                                <TextBlock Text="接入已有工作空间" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Style="{StaticResource SectionDesc}"
+                                           Text="指向一个已存在的隔离目录，沿用其中的认证与设置。" />
                                 <TextBlock Text="已有工作空间目录 / Codex Home" Style="{StaticResource FieldLabel}" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -134,12 +160,12 @@
                                         <ColumnDefinition Width="12" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="ExistingPathBox" Style="{StaticResource InputTextBox}" />
+                                    <TextBox x:Name="ExistingPathBox" Style="{StaticResource InputTextBox}"
+                                             ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
                                     <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Height="40"
                                             Content="浏览…" Click="BrowseExistingButton_Click" />
                                 </Grid>
-                                <TextBlock Margin="0,9,0,0" Foreground="#7F8AA3" FontSize="11"
-                                           TextWrapping="Wrap"
+                                <TextBlock Margin="0,9,0,0" Style="{StaticResource HintText}"
                                            Text="原地接入，不复制任何配置、对话、数据库或界面状态。仅支持多开器本地 profiles 目录中保留的工作空间。" />
                             </StackPanel>
                         </Border>
@@ -147,6 +173,9 @@
                         <StackPanel x:Name="ProviderPanel">
                             <Border x:Name="CustomProviderPanel" Style="{StaticResource SectionCard}">
                                 <StackPanel>
+                                    <TextBlock Text="自定义 Provider" Style="{StaticResource SectionHeader}" />
+                                    <TextBlock Style="{StaticResource SectionDesc}"
+                                               Text="连接兼容 Responses 接口的自建或第三方服务。" />
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -200,7 +229,7 @@
                                     <PasswordBox x:Name="ApiKeyBox" Style="{StaticResource InputPasswordBox}" />
                                     <TextBlock x:Name="ApiKeyHintText"
                                                Text="仅原子写入隔离 auth.json，不回显、不写日志、不进入快照。"
-                                               Margin="0,6,0,0" Foreground="#737E94" FontSize="10.5" />
+                                               Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -214,11 +243,11 @@
                         <ColumnDefinition Width="190" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="FooterText" Text="配置保存在本机隔离目录"
-                               Foreground="#778197" FontSize="10.5" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
                     <Button x:Name="SaveButton" Grid.Column="2" Style="{StaticResource PrimaryButton}"
                             Click="SaveButton_Click">
-                        <TextBlock x:Name="SaveButtonText" Text="保存工作空间" Foreground="#11101A" FontWeight="Bold" />
+                        <TextBlock x:Name="SaveButtonText" Text="保存工作空间" Foreground="#1A120A" FontWeight="Bold" />
                     </Button>
                 </Grid>
             </Grid>

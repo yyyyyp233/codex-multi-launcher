@@ -12,12 +12,17 @@ public partial class WorkProfileSetupWindow : Window
     private readonly string? profileId;
     private readonly ProfileSetupStatus initialStatus;
     private readonly bool editingExisting;
+    private readonly string? previewOutput;
     private bool isBusy;
 
-    public WorkProfileSetupWindow(ProfileCoordinator coordinator, string? profileId = null)
+    public WorkProfileSetupWindow(
+        ProfileCoordinator coordinator,
+        string? profileId = null,
+        string? previewOutput = null)
     {
         this.coordinator = coordinator;
         this.profileId = profileId;
+        this.previewOutput = string.IsNullOrWhiteSpace(previewOutput) ? null : previewOutput;
         initialStatus = string.IsNullOrWhiteSpace(profileId)
             ? new ProfileSetupStatus(WorkProfileSetupState.NotConfigured, null, null)
             : coordinator.GetProfileSetupStatus(profileId);
@@ -25,9 +30,20 @@ public partial class WorkProfileSetupWindow : Window
 
         InitializeComponent();
         PopulateInitialState();
+        if (this.previewOutput is not null)
+        {
+            Loaded += WorkProfileSetupWindow_Loaded;
+        }
     }
 
     public bool Completed { get; private set; }
+
+    private async void WorkProfileSetupWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        await Task.Delay(220);
+        WindowPreviewCapture.Save(this, previewOutput!);
+        Close();
+    }
 
     private void PopulateInitialState()
     {

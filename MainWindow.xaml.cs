@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CodexChannelLauncher.Core;
 
@@ -120,60 +119,14 @@ public partial class MainWindow : Window
             }
         }
 
-        if (previewOutput is null && SystemParameters.ClientAreaAnimation)
-        {
-            StartLavaMotion();
-        }
-
         statusTimer.Start();
         if (previewOutput is not null)
         {
             statusTimer.Stop();
             await Task.Delay(700);
-            CapturePreview(previewOutput);
+            WindowPreviewCapture.Save(this, previewOutput);
             Close();
         }
-    }
-
-    private void StartLavaMotion()
-    {
-        AnimateLava(LavaVioletShift, TranslateTransform.XProperty, -35, 130, 19);
-        AnimateLava(LavaVioletShift, TranslateTransform.YProperty, -25, 105, 23);
-        AnimateLava(LavaVioletScale, ScaleTransform.ScaleXProperty, 0.92, 1.18, 17);
-        AnimateLava(LavaVioletScale, ScaleTransform.ScaleYProperty, 1.15, 0.88, 21);
-        AnimateLava(LavaVioletRotate, RotateTransform.AngleProperty, -11, 20, 29);
-        AnimateLava(LavaTealShift, TranslateTransform.XProperty, 70, -125, 27);
-        AnimateLava(LavaTealShift, TranslateTransform.YProperty, -55, 100, 22);
-        AnimateLava(LavaTealScale, ScaleTransform.ScaleXProperty, 1.12, 0.87, 24);
-        AnimateLava(LavaTealScale, ScaleTransform.ScaleYProperty, 0.9, 1.2, 19);
-        AnimateLava(LavaTealRotate, RotateTransform.AngleProperty, 12, -22, 31);
-        AnimateLava(LavaRoseShift, TranslateTransform.XProperty, -115, 125, 23);
-        AnimateLava(LavaRoseShift, TranslateTransform.YProperty, 65, -105, 26);
-        AnimateLava(LavaRoseScale, ScaleTransform.ScaleXProperty, 0.88, 1.2, 20);
-        AnimateLava(LavaRoseScale, ScaleTransform.ScaleYProperty, 1.16, 0.9, 24);
-        AnimateLava(LavaRoseRotate, RotateTransform.AngleProperty, -16, 24, 33);
-        AnimateLava(LavaBlueShift, TranslateTransform.XProperty, -45, 155, 29);
-        AnimateLava(LavaBlueShift, TranslateTransform.YProperty, 35, -120, 25);
-        AnimateLava(LavaBlueScale, ScaleTransform.ScaleXProperty, 1.14, 0.9, 22);
-        AnimateLava(LavaBlueScale, ScaleTransform.ScaleYProperty, 0.9, 1.17, 27);
-        AnimateLava(LavaBlueRotate, RotateTransform.AngleProperty, 8, -20, 35);
-    }
-
-    private static void AnimateLava(
-        Animatable target,
-        DependencyProperty property,
-        double from,
-        double to,
-        double seconds)
-    {
-        var animation = new DoubleAnimation(from, to, TimeSpan.FromSeconds(seconds))
-        {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
-        };
-        Timeline.SetDesiredFrameRate(animation, 24);
-        target.BeginAnimation(property, animation);
     }
 
     private void Window_SourceInitialized(object? sender, EventArgs e) => NativeAppearance.Apply(this);
@@ -380,8 +333,8 @@ public partial class MainWindow : Window
         ProfileCards.ItemsSource = cards;
 
         PackageVersionText.Text = status.Package is null
-            ? "APP NOT FOUND"
-            : $"APP  {status.Package.PackageVersion}  ·  x64";
+            ? "NOT FOUND"
+            : $"{status.Package.PackageVersion}  ·  x64";
         PackageVersionText.ToolTip = status.Package?.ExecutablePath;
 
         var readyCount = status.ManagedProfiles.Count(profile =>
@@ -449,7 +402,7 @@ public partial class MainWindow : Window
             _ => metadata?.BaseUrl.Replace("https://", string.Empty, StringComparison.OrdinalIgnoreCase)
                      .TrimEnd('/') ?? "配置不可用"
         };
-        var color = registration.AccentColor;
+        const string color = "#F58A32";
         var requiresConfiguration = profile.Problem is not null || metadata?.AuthConfigured != true;
         var available = !requiresConfiguration && package?.SupportsIsolatedElectronData == true;
         return new ProfileCardViewModel
@@ -486,9 +439,9 @@ public partial class MainWindow : Window
             AccentBrush = Brush(color),
             AccentSoftBrush = Brush(WithAlpha(color, "28")),
             CardBorderBrush = Brush(WithAlpha(color, "66")),
-            StatusBrush = Brush(running ? color : profile.Problem is not null ? "#F08D96" : "#929AAF"),
-            StatusBackgroundBrush = Brush(running ? WithAlpha(color, "20") : "#121722"),
-            StatusBorderBrush = Brush(running ? WithAlpha(color, "70") : "#2A3244"),
+            StatusBrush = Brush(running ? "#65DFB2" : profile.Problem is not null ? "#F08D96" : "#929AAF"),
+            StatusBackgroundBrush = Brush(running ? "#142A25" : "#121722"),
+            StatusBorderBrush = Brush(running ? "#285443" : "#2A3244"),
             CanLaunch = available,
             RequiresConfiguration = requiresConfiguration
         };
@@ -547,7 +500,7 @@ public partial class MainWindow : Window
         ParallelSummaryText.Text = ParallelToggle.IsChecked == true
             ? "本次已开启 · 允许多个独立空间同时运行"
             : "默认关闭 · 不自动关闭或复用其他实例";
-        ParallelSummaryText.Foreground = Brush(ParallelToggle.IsChecked == true ? "#AEA3F5" : "#707B91");
+        ParallelSummaryText.Foreground = Brush(ParallelToggle.IsChecked == true ? "#F58A32" : "#707B91");
     }
 
     private async Task<bool> OpenSetupWindowAsync(string? profileId)
@@ -606,19 +559,4 @@ public partial class MainWindow : Window
     private static string WithAlpha(string color, string alpha) =>
         color.Length == 7 ? $"#{alpha}{color[1..]}" : color;
 
-    private void CapturePreview(string outputPath)
-    {
-        UpdateLayout();
-        var visual = (FrameworkElement)Content;
-        var width = Math.Max(1, (int)Math.Ceiling(visual.ActualWidth));
-        var height = Math.Max(1, (int)Math.Ceiling(visual.ActualHeight));
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(visual);
-
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        encoder.Save(stream);
-    }
 }

@@ -23,12 +23,9 @@
                             UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
-        <SolidColorBrush x:Key="PanelBrush" Color="#E8141924" />
-        <SolidColorBrush x:Key="PanelStrokeBrush" Color="#30384B" />
-
         <Style x:Key="PanelCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource PanelStrokeBrush}" />
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="14" />
             <Setter Property="Padding" Value="14" />
@@ -36,10 +33,10 @@
 
         <Style x:Key="DiffTextBox" TargetType="TextBox" BasedOn="{StaticResource InputTextBox}">
             <Setter Property="Height" Value="Auto" />
-            <Setter Property="Background" Value="#101520" />
-            <Setter Property="Foreground" Value="#DDE3EF" />
-            <Setter Property="CaretBrush" Value="#C8BEFF" />
-            <Setter Property="BorderBrush" Value="#30384B" />
+            <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="CaretBrush" Value="{StaticResource AccentBrightBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="9" />
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
@@ -52,6 +49,11 @@
             <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
         </Style>
 
+        <Style x:Key="ResultDiffTextBox" TargetType="TextBox" BasedOn="{StaticResource DiffTextBox}">
+            <Setter Property="Background" Value="{StaticResource OrangeSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        </Style>
+
         <Style x:Key="SmallActionButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
             <Setter Property="Height" Value="30" />
             <Setter Property="Padding" Value="10,0" />
@@ -59,15 +61,15 @@
         </Style>
 
         <Style x:Key="FileListStyle" TargetType="ListBox">
-            <Setter Property="Background" Value="#8C0E131D" />
-            <Setter Property="BorderBrush" Value="#293143" />
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="4" />
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
         </Style>
 
         <Style TargetType="ListBoxItem">
-            <Setter Property="Foreground" Value="#DDE2EC" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="Padding" Value="10,8" />
             <Setter Property="Margin" Value="2" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -80,12 +82,22 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#171D2A" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource Surface2Brush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#28223F" />
-                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#5B4E8B" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource OrangeSoftBrush}" />
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                             </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="IsKeyboardFocusWithin" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AccentBrightBrush}" />
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -93,15 +105,9 @@
         </Style>
     </Window.Resources>
 
-    <Border CornerRadius="18" BorderBrush="#444C62" BorderThickness="1" Background="#0B0E16">
-        <Grid x:Name="RootContent" ClipToBounds="True">
-            <Grid.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#111528" Offset="0" />
-                    <GradientStop Color="#0B0E16" Offset="0.48" />
-                    <GradientStop Color="#161020" Offset="1" />
-                </LinearGradientBrush>
-            </Grid.Background>
+    <Border CornerRadius="18" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+            Background="{StaticResource WindowBackgroundBrush}">
+        <Grid x:Name="RootContent" ClipToBounds="True" Background="{StaticResource WindowBackgroundBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="58" />
                 <RowDefinition Height="Auto" />
@@ -109,7 +115,7 @@
                 <RowDefinition Height="66" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" BorderBrush="#232A3B" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,0,0,1">
                 <Grid Margin="20,0,13,0" Background="Transparent">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -117,15 +123,15 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Border Width="30" Height="30" CornerRadius="10" VerticalAlignment="Center"
-                            Background="#9D8CFF">
-                        <TextBlock Text="⇄" Foreground="#11131B" FontSize="15" FontWeight="Bold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            Background="{StaticResource AccentBrush}">
+                        <TextBlock Text="⇄" Foreground="{StaticResource WindowBackgroundBrush}" FontSize="15"
+                                   FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="差异合并工作台" FontFamily="{StaticResource DisplayFont}"
                                    FontSize="15" FontWeight="SemiBold" />
                         <TextBlock x:Name="ScopeText" Text="个人 / 工作空间 · 逐块 Diff 与三方 Merge"
-                                   FontSize="10.5" Foreground="#7D879D" Margin="0,2,0,0" />
+                                   FontSize="10.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
@@ -137,7 +143,8 @@
             </Border>
 
             <Border Grid.Row="1" Margin="20,14,20,12" Padding="14,10" CornerRadius="13"
-                    Background="#B6131823" BorderBrush="#30384B" BorderThickness="1">
+                    Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource StrokeBrush}"
+                    BorderThickness="1">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -149,7 +156,7 @@
                     <StackPanel Grid.Column="1" Margin="11,0,0,0">
                         <TextBlock x:Name="RuntimeText" Text="正在读取运行状态" FontSize="12" FontWeight="SemiBold" />
                         <TextBlock Text="查看差异不受影响；写回前必须完全退出个人与工作空间 App。"
-                                   Foreground="#778299" FontSize="10" Margin="0,3,0,0" />
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" Margin="0,3,0,0" />
                     </StackPanel>
                     <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Height="34"
                             Content="刷新差异" Click="RefreshButton_Click" />
@@ -172,7 +179,7 @@
                         </Grid.RowDefinitions>
                         <StackPanel>
                             <TextBlock Text="差异文件" FontSize="16" FontWeight="SemiBold" />
-                            <TextBlock x:Name="FileCountText" Text="正在读取" Foreground="#7C879C"
+                            <TextBlock x:Name="FileCountText" Text="正在读取" Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="10.5" Margin="0,4,0,0" />
                         </StackPanel>
                         <ListBox x:Name="FileList" Grid.Row="2" Style="{StaticResource FileListStyle}"
@@ -182,9 +189,9 @@
                                     <StackPanel>
                                         <TextBlock Text="{Binding RelativePath}" FontFamily="Cascadia Mono, Consolas"
                                                    FontSize="10.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding StatusText}" Foreground="#B8ADF2"
+                                        <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource AccentBrightBrush}"
                                                    FontSize="10" Margin="0,4,0,0" />
-                                        <TextBlock Text="{Binding DetailText}" Foreground="#667189"
+                                        <TextBlock Text="{Binding DetailText}" Foreground="{StaticResource TextSecondaryBrush}"
                                                    FontSize="9.5" Margin="0,2,0,0" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -209,7 +216,7 @@
                                 <TextBlock x:Name="SelectedPathText" Text="请选择差异文件"
                                            FontFamily="Cascadia Mono, Consolas" FontSize="13"
                                            FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <TextBlock x:Name="DocumentMetaText" Text="—" Foreground="#737E95"
+                                <TextBlock x:Name="DocumentMetaText" Text="—" Foreground="{StaticResource TextSecondaryBrush}"
                                            FontSize="10" Margin="0,4,0,0" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -237,7 +244,7 @@
 
                         <Grid Grid.Row="2">
                             <TextBlock x:Name="EmptySelectionText" Text="从左侧选择文件后，可逐块采用个人或工作空间内容。"
-                                       Foreground="#778299" HorizontalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
 
                             <Grid x:Name="TextMergePanel" Visibility="Collapsed">
@@ -251,10 +258,10 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="MergeSummaryText" Text="—" Foreground="#AAB3C4"
+                                    <TextBlock x:Name="MergeSummaryText" Text="—" Foreground="{StaticResource TextPrimaryBrush}"
                                                FontSize="11" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <TextBlock Text="文件存在状态：" Foreground="#778299" FontSize="10.5"
+                                        <TextBlock Text="文件存在状态：" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5"
                                                    VerticalAlignment="Center" />
                                         <TextBlock x:Name="ExistenceStateText" Text="—" FontSize="10.5"
                                                    FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -265,7 +272,7 @@
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <Border Margin="0,0,0,10" Padding="12" CornerRadius="12"
-                                                    Background="#111722" BorderBrush="#30384B" BorderThickness="1">
+                                                    Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1">
                                                 <Grid>
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="Auto" />
@@ -284,7 +291,7 @@
                                                         <TextBlock Text="{Binding HeaderText}" FontWeight="SemiBold"
                                                                    FontSize="11" />
                                                         <TextBlock Grid.Column="1" Text="{Binding ResolutionText}"
-                                                                   Foreground="#B8ADF2" FontSize="10.5" />
+                                                                   Foreground="{StaticResource AccentBrightBrush}" FontSize="10.5" />
                                                     </Grid>
                                                     <Grid Grid.Row="2">
                                                         <Grid.ColumnDefinitions>
@@ -297,19 +304,19 @@
                                                         <StackPanel>
                                                             <TextBlock Text="个人" Foreground="#74DDB8" FontSize="10"
                                                                        Margin="2,0,0,4" />
-                                                            <TextBox Style="{StaticResource DiffTextBox}" Text="{Binding PersonalText}"
+                                                            <TextBox Style="{StaticResource DiffTextBox}" Text="{Binding PersonalText, Mode=OneWay}"
                                                                      IsReadOnly="True" MaxHeight="130" />
                                                         </StackPanel>
                                                         <StackPanel Grid.Column="2">
-                                                            <TextBlock Text="共同基线" Foreground="#8792A8" FontSize="10"
+                                                            <TextBlock Text="共同基线" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10"
                                                                        Margin="2,0,0,4" />
-                                                            <TextBox Style="{StaticResource DiffTextBox}" Text="{Binding BaseText}"
+                                                            <TextBox Style="{StaticResource DiffTextBox}" Text="{Binding BaseText, Mode=OneWay}"
                                                                      IsReadOnly="True" MaxHeight="130" />
                                                         </StackPanel>
                                                         <StackPanel Grid.Column="4">
-                                                            <TextBlock Text="工作空间" Foreground="#B8ADF2" FontSize="10"
+                                                            <TextBlock Text="工作空间" Foreground="{StaticResource AccentBrightBrush}" FontSize="10"
                                                                        Margin="2,0,0,4" />
-                                                            <TextBox Style="{StaticResource DiffTextBox}" Text="{Binding CompanyText}"
+                                                            <TextBox Style="{StaticResource DiffTextBox}" Text="{Binding CompanyText, Mode=OneWay}"
                                                                      IsReadOnly="True" MaxHeight="130" />
                                                         </StackPanel>
                                                     </Grid>
@@ -322,7 +329,7 @@
                                                                 Margin="7,0,0,0" Click="AdoptBothBlockButton_Click" />
                                                     </StackPanel>
                                                     <StackPanel Grid.Row="6">
-                                                        <TextBlock Text="合并结果（可直接编辑）" Foreground="#D8D1FF"
+                                                        <TextBlock Text="合并结果（可直接编辑）" Foreground="{StaticResource AccentBrightBrush}"
                                                                    FontSize="10" Margin="2,0,0,4" />
                                                         <TextBox Style="{StaticResource DiffTextBox}"
                                                                  Text="{Binding ResultText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -336,15 +343,15 @@
                             </Grid>
 
                             <Border x:Name="BinaryPanel" Visibility="Collapsed" CornerRadius="12"
-                                    Background="#111722" BorderBrush="#30384B" BorderThickness="1" Padding="22">
+                                    Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1" Padding="22">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="570">
                                     <TextBlock Text="该文件只能整文件采用" FontSize="18" FontWeight="SemiBold"
                                                HorizontalAlignment="Center" />
                                     <TextBlock x:Name="BinaryDetailText" Text="二进制或超大文本不支持逐块编辑。"
-                                               Foreground="#8792A8" TextWrapping="Wrap" TextAlignment="Center"
+                                               Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center"
                                                Margin="0,10,0,0" />
                                     <TextBlock Text="请在上方选择“整文件采用个人”“整文件采用工作空间”或“结果删除文件”，再选择写入目标。"
-                                               Foreground="#737E95" TextWrapping="Wrap" TextAlignment="Center"
+                                               Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center"
                                                Margin="0,8,0,0" />
                                 </StackPanel>
                             </Border>
@@ -353,7 +360,7 @@
                 </Border>
             </Grid>
 
-            <Border Grid.Row="3" BorderBrush="#232A3B" BorderThickness="0,1,0,0" Background="#760B0E16">
+            <Border Grid.Row="3" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,1,0,0" Background="#760B0E16">
                 <Grid Margin="20,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -362,9 +369,9 @@
                         <ColumnDefinition Width="190" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock x:Name="FooterStatusText" Text="请选择差异文件" Foreground="#A7B0C1"
+                        <TextBlock x:Name="FooterStatusText" Text="请选择差异文件" Foreground="{StaticResource TextPrimaryBrush}"
                                    FontSize="11" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="UnresolvedText" Text="—" Foreground="#707B91"
+                        <TextBlock x:Name="UnresolvedText" Text="—" Foreground="{StaticResource TextSecondaryBrush}"
                                    FontSize="9.5" Margin="0,3,0,0" />
                     </StackPanel>
                     <ComboBox x:Name="TargetBox" Grid.Column="1" Width="160" Height="36"

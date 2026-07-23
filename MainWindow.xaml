@@ -23,26 +23,23 @@
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
-        <LinearGradientBrush x:Key="CardSurfaceBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#D91A1F2B" Offset="0" />
-            <GradientStop Color="#BE111621" Offset="1" />
-        </LinearGradientBrush>
+        <SolidColorBrush x:Key="CardSurfaceBrush" Color="#101216" />
         <SolidColorBrush x:Key="WarningBrush" Color="#F3C777" />
 
         <Style x:Key="EyebrowText" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#7E89A1" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
             <Setter Property="FontSize" Value="10" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
 
         <Style x:Key="MetricCaption" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#68738B" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
             <Setter Property="FontSize" Value="10" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
         <Style x:Key="MetricValue" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#D8DDEA" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,5,0,0" />
@@ -52,131 +49,18 @@
         <Style x:Key="StatusPill" TargetType="Border">
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="Padding" Value="10,5" />
-            <Setter Property="Background" Value="#121722" />
-            <Setter Property="BorderBrush" Value="#2A3244" />
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
     </Window.Resources>
 
     <Border CornerRadius="18"
-            BorderBrush="#3A4257"
+            BorderBrush="{StaticResource StrokeBrush}"
             BorderThickness="1"
-            Background="#0B0E16">
-        <Grid x:Name="RootContent" ClipToBounds="True" Opacity="0">
-            <Grid.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#F40B0F18" Offset="0" />
-                    <GradientStop Color="#F20D1019" Offset="0.58" />
-                    <GradientStop Color="#F412101B" Offset="1" />
-                </LinearGradientBrush>
-            </Grid.Background>
-
-            <Canvas x:Name="LavaLayer"
-                    Margin="-120"
-                    IsHitTestVisible="False"
-                    ClipToBounds="False">
-                <Ellipse Width="600"
-                         Height="470"
-                         Canvas.Left="-90"
-                         Canvas.Top="-120"
-                         Opacity="0.56"
-                         RenderTransformOrigin="0.5,0.5">
-                    <Ellipse.Effect>
-                        <BlurEffect Radius="92" RenderingBias="Performance" />
-                    </Ellipse.Effect>
-                    <Ellipse.Fill>
-                        <RadialGradientBrush Center="0.42,0.42" GradientOrigin="0.38,0.35" RadiusX="0.62" RadiusY="0.62">
-                            <GradientStop Color="#BD8D65FF" Offset="0" />
-                            <GradientStop Color="#6B6749DE" Offset="0.48" />
-                            <GradientStop Color="#006749DE" Offset="1" />
-                        </RadialGradientBrush>
-                    </Ellipse.Fill>
-                    <Ellipse.RenderTransform>
-                        <TransformGroup>
-                            <ScaleTransform x:Name="LavaVioletScale" ScaleX="1" ScaleY="1" />
-                            <RotateTransform x:Name="LavaVioletRotate" Angle="-8" />
-                            <TranslateTransform x:Name="LavaVioletShift" />
-                        </TransformGroup>
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-
-                <Ellipse Width="660"
-                         Height="520"
-                         Canvas.Left="700"
-                         Canvas.Top="-40"
-                         Opacity="0.48"
-                         RenderTransformOrigin="0.5,0.5">
-                    <Ellipse.Effect>
-                        <BlurEffect Radius="105" RenderingBias="Performance" />
-                    </Ellipse.Effect>
-                    <Ellipse.Fill>
-                        <RadialGradientBrush Center="0.45,0.45" GradientOrigin="0.56,0.35" RadiusX="0.64" RadiusY="0.64">
-                            <GradientStop Color="#A846C9C1" Offset="0" />
-                            <GradientStop Color="#574087A9" Offset="0.5" />
-                            <GradientStop Color="#004087A9" Offset="1" />
-                        </RadialGradientBrush>
-                    </Ellipse.Fill>
-                    <Ellipse.RenderTransform>
-                        <TransformGroup>
-                            <ScaleTransform x:Name="LavaTealScale" ScaleX="1" ScaleY="1" />
-                            <RotateTransform x:Name="LavaTealRotate" Angle="10" />
-                            <TranslateTransform x:Name="LavaTealShift" />
-                        </TransformGroup>
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-
-                <Ellipse Width="570"
-                         Height="430"
-                         Canvas.Left="360"
-                         Canvas.Top="380"
-                         Opacity="0.44"
-                         RenderTransformOrigin="0.5,0.5">
-                    <Ellipse.Effect>
-                        <BlurEffect Radius="98" RenderingBias="Performance" />
-                    </Ellipse.Effect>
-                    <Ellipse.Fill>
-                        <RadialGradientBrush Center="0.48,0.5" GradientOrigin="0.36,0.58" RadiusX="0.65" RadiusY="0.65">
-                            <GradientStop Color="#B8E46F78" Offset="0" />
-                            <GradientStop Color="#656C3C84" Offset="0.52" />
-                            <GradientStop Color="#006C3C84" Offset="1" />
-                        </RadialGradientBrush>
-                    </Ellipse.Fill>
-                    <Ellipse.RenderTransform>
-                        <TransformGroup>
-                            <ScaleTransform x:Name="LavaRoseScale" ScaleX="1" ScaleY="1" />
-                            <RotateTransform x:Name="LavaRoseRotate" Angle="-14" />
-                            <TranslateTransform x:Name="LavaRoseShift" />
-                        </TransformGroup>
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-
-                <Ellipse Width="520"
-                         Height="420"
-                         Canvas.Left="-150"
-                         Canvas.Top="470"
-                         Opacity="0.42"
-                         RenderTransformOrigin="0.5,0.5">
-                    <Ellipse.Effect>
-                        <BlurEffect Radius="96" RenderingBias="Performance" />
-                    </Ellipse.Effect>
-                    <Ellipse.Fill>
-                        <RadialGradientBrush Center="0.48,0.46" GradientOrigin="0.42,0.58" RadiusX="0.66" RadiusY="0.66">
-                            <GradientStop Color="#A94E89E8" Offset="0" />
-                            <GradientStop Color="#55455BB4" Offset="0.53" />
-                            <GradientStop Color="#00455BB4" Offset="1" />
-                        </RadialGradientBrush>
-                    </Ellipse.Fill>
-                    <Ellipse.RenderTransform>
-                        <TransformGroup>
-                            <ScaleTransform x:Name="LavaBlueScale" ScaleX="1" ScaleY="1" />
-                            <RotateTransform x:Name="LavaBlueRotate" Angle="6" />
-                            <TranslateTransform x:Name="LavaBlueShift" />
-                        </TransformGroup>
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-            </Canvas>
-
-            <Border IsHitTestVisible="False" Background="#31070A11" />
+            Background="{StaticResource WindowBackgroundBrush}">
+        <Grid x:Name="RootContent" ClipToBounds="True" Opacity="0"
+              Background="{StaticResource WindowBackgroundBrush}">
 
             <Grid>
                 <Grid.RowDefinitions>
@@ -184,7 +68,7 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" BorderBrush="#202637" BorderThickness="0,0,0,1">
+                <Border Grid.Row="0" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,0,0,1">
                     <Grid Margin="20,0,14,0" Background="Transparent">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -192,16 +76,16 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Width="28" Height="28" CornerRadius="9" VerticalAlignment="Center">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="#C9BFFF" Offset="0" />
-                                    <GradientStop Color="#6655C9" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
+                        <Border Width="28"
+                                Height="28"
+                                CornerRadius="9"
+                                VerticalAlignment="Center"
+                                Background="{StaticResource OrangeSoftBrush}"
+                                BorderBrush="{StaticResource AccentBrush}"
+                                BorderThickness="1">
                             <TextBlock Text="✦"
                                        FontSize="14"
-                                       Foreground="#11131B"
+                                       Foreground="{StaticResource AccentBrightBrush}"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center" />
                         </Border>
@@ -211,7 +95,7 @@
                                        FontFamily="{StaticResource DisplayFont}"
                                        FontSize="12"
                                        FontWeight="Bold"
-                                       Foreground="#C9CFDC" />
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2"
@@ -235,8 +119,8 @@
                             Margin="0,0,0,18"
                             Padding="15,11"
                             CornerRadius="15"
-                            Background="#A9121722"
-                            BorderBrush="#30384B"
+                            Background="{StaticResource Surface1Brush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
                             BorderThickness="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -263,7 +147,8 @@
                                        Text="正在核对隔离边界"
                                        FontSize="12"
                                        FontWeight="SemiBold"
-                                       Foreground="#C6CCDA"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis"
                                        Margin="10,0,0,0"
                                        VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2"
@@ -276,7 +161,8 @@
                                        Text="detecting…"
                                        FontFamily="Cascadia Mono, Consolas"
                                        FontSize="11"
-                                       Foreground="#AEB6C8"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" />
                         </Grid>
                     </Border>
@@ -304,9 +190,6 @@
                                             BorderThickness="1"
                                             Padding="22,20"
                                             Tag="{Binding IdentityKey}">
-                                        <Border.Effect>
-                                            <DropShadowEffect Color="#000000" BlurRadius="20" ShadowDepth="7" Opacity="0.20" />
-                                        </Border.Effect>
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />
@@ -390,7 +273,7 @@
                                             <TextBlock Grid.Row="1"
                                                        Text="{Binding Description}"
                                                        TextWrapping="Wrap"
-                                                       Foreground="#929CB1"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
                                                        FontSize="11.5"
                                                        LineHeight="18"
                                                        Margin="0,13,0,0" />
@@ -398,8 +281,8 @@
                                             <Border Grid.Row="2"
                                                     Margin="0,15,0,17"
                                                     CornerRadius="13"
-                                                    Background="#A60E121C"
-                                                    BorderBrush="#232B3C"
+                                                    Background="{StaticResource Surface2Brush}"
+                                                    BorderBrush="{StaticResource StrokeBrush}"
                                                     BorderThickness="1"
                                                     Padding="14,11"
                                                     VerticalAlignment="Top">
@@ -421,7 +304,7 @@
                                                                    ToolTip="{Binding PrimaryValue}"
                                                                    Style="{StaticResource MetricValue}" />
                                                     </StackPanel>
-                                                    <Border Grid.Column="1" Background="#242C3E" />
+                                                    <Border Grid.Column="1" Background="{StaticResource StrokeBrush}" />
                                                     <StackPanel Grid.Column="2" Margin="14,0,0,0">
                                                         <TextBlock Text="{Binding SecondaryLabel}" Style="{StaticResource MetricCaption}" />
                                                         <TextBlock Text="{Binding SecondaryValue}"
@@ -483,8 +366,8 @@
                             Margin="0,20,0,0"
                             Padding="18,14"
                             CornerRadius="17"
-                            Background="#A510141E"
-                            BorderBrush="#282F40"
+                            Background="{StaticResource Surface1Brush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
                             BorderThickness="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -504,15 +387,15 @@
                                 <TextBlock Text="允许并行启动"
                                            FontSize="12"
                                            FontWeight="SemiBold"
-                                           Foreground="#CFD4E0" />
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
                                 <TextBlock x:Name="ParallelSummaryText"
                                            Text="默认关闭 · 不同实例不会被自动关闭或互相复用"
                                            FontSize="10.5"
-                                           Foreground="#707B91"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
                                            Margin="0,3,0,0" />
                             </StackPanel>
 
-                            <Border Grid.Column="2" Width="1" Height="30" Background="#2B3244" Margin="0,0,16,0" />
+                            <Border Grid.Column="2" Width="1" Height="30" Background="{StaticResource StrokeBrush}" Margin="0,0,16,0" />
                             <Button Grid.Column="3"
                                     x:Name="NewProfileButton"
                                     Style="{StaticResource SecondaryButton}"
@@ -537,8 +420,8 @@
                         Margin="0,0,0,24"
                         Padding="16,11"
                         CornerRadius="14"
-                        Background="#F21B2130"
-                        BorderBrush="#3C465E"
+                        Background="{StaticResource Surface2Brush}"
+                        BorderBrush="{StaticResource StrokeBrush}"
                         BorderThickness="1">
                     <Border.Effect>
                         <DropShadowEffect Color="#000000" BlurRadius="18" ShadowDepth="5" Opacity="0.42" />
@@ -549,7 +432,7 @@
                                    Text="状态已刷新"
                                    FontSize="12"
                                    FontWeight="SemiBold"
-                                   Foreground="#E3E7F0"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
                                    Margin="10,0,0,0" />
                     </StackPanel>
                 </Border>
@@ -564,16 +447,16 @@
                             CornerRadius="24"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Background="#F51A1F2B"
-                            BorderBrush="#474F65"
+                            Background="{StaticResource Surface1Brush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
                             BorderThickness="1">
                         <Border.Effect>
                             <DropShadowEffect Color="#000000" BlurRadius="35" ShadowDepth="10" Opacity="0.58" />
                         </Border.Effect>
                         <StackPanel>
-                            <Border Width="44" Height="44" CornerRadius="14" Background="#2B2540" HorizontalAlignment="Left">
+                            <Border Width="44" Height="44" CornerRadius="14" Background="{StaticResource OrangeSoftBrush}" HorizontalAlignment="Left">
                                 <TextBlock Text="Ⅱ"
-                                           Foreground="#C8BEFF"
+                                           Foreground="{StaticResource AccentBrightBrush}"
                                            FontSize="16"
                                            FontWeight="Bold"
                                            HorizontalAlignment="Center"
@@ -587,14 +470,14 @@
                                        Margin="0,18,0,0" />
                             <TextBlock x:Name="DialogBodyText"
                                        Text="安全模式不会自动关闭任何 Codex 窗口。"
-                                       Foreground="#949EB2"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="12"
                                        TextWrapping="Wrap"
                                        LineHeight="19"
                                        Margin="0,10,0,0" />
-                            <Border CornerRadius="13" Background="#121722" BorderBrush="#2C3447" BorderThickness="1" Padding="13,10" Margin="0,18,0,0">
+                            <Border CornerRadius="13" Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1" Padding="13,10" Margin="0,18,0,0">
                                 <TextBlock Text="并行时账号与本地状态隔离，但工作目录、Chrome 和 Unity 等外部资源仍然共享。"
-                                           Foreground="#B4BBC9"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
                                            FontSize="11"
                                            TextWrapping="Wrap"
                                            LineHeight="17" />

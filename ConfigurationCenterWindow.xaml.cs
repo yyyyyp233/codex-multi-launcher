@@ -5,7 +5,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Imaging;
 using CodexChannelLauncher.Core;
 
 namespace CodexChannelLauncher;
@@ -32,13 +31,15 @@ public partial class ConfigurationCenterWindow : Window
     {
         this.coordinator = coordinator;
         service = coordinator.ConfigurationCenter;
-        profileRegistration = coordinator.GetProfiles().FirstOrDefault(profile =>
-            profile.ProfileDirectoryName.Equals(
-                coordinator.Paths.WorkProfileDirectoryName,
-                StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException("当前隔离空间未注册，无法打开配置中心。");
-        profileId = profileRegistration.ProfileId;
         this.previewOutput = string.IsNullOrWhiteSpace(previewOutput) ? null : previewOutput;
+        profileRegistration = this.previewOutput is not null
+            ? CreatePreviewRegistration()
+            : coordinator.GetProfiles().FirstOrDefault(profile =>
+                profile.ProfileDirectoryName.Equals(
+                    coordinator.Paths.WorkProfileDirectoryName,
+                    StringComparison.OrdinalIgnoreCase))
+              ?? throw new InvalidOperationException("当前隔离空间未注册，无法打开配置中心。");
+        profileId = profileRegistration.ProfileId;
         InitializeComponent();
         ProfilePathText.Text = coordinator.Paths.CompanyCodexHome;
         ProfilePathText.ToolTip = coordinator.Paths.CompanyCodexHome;
@@ -56,14 +57,17 @@ public partial class ConfigurationCenterWindow : Window
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         });
-        await RefreshAllAsync(false);
 
         if (previewOutput is not null)
         {
-            await Task.Delay(450);
-            CapturePreview(previewOutput);
+            PopulatePreviewState();
+            await Task.Delay(280);
+            WindowPreviewCapture.Save(this, previewOutput);
             Close();
+            return;
         }
+
+        await RefreshAllAsync(false);
     }
 
     private void Window_SourceInitialized(object? sender, EventArgs e) => NativeAppearance.Apply(this);
@@ -1041,19 +1045,36 @@ public partial class ConfigurationCenterWindow : Window
         }
     }
 
-    private void CapturePreview(string outputPath)
+    private static ManagedProfileRegistration CreatePreviewRegistration()
     {
-        UpdateLayout();
-        var visual = (FrameworkElement)Content;
-        var width = Math.Max(1, (int)Math.Ceiling(visual.ActualWidth));
-        var height = Math.Max(1, (int)Math.Ceiling(visual.ActualHeight));
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(visual);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        encoder.Save(stream);
+        var now = DateTime.UtcNow;
+        return new ManagedProfileRegistration(
+            1,
+            "ui-preview",
+            "ui-preview",
+            "工作空间",
+            ProfileAuthMode.CustomResponses,
+            "#F58A32",
+            now,
+            now);
+    }
+
+    private void PopulatePreviewState()
+    {
+        ProfileStateDot.Fill = Brush("#65DFB2");
+        ProfileStateText.Text = "工作空间配置已就绪";
+        ProfilePathText.Text = @"%LOCALAPPDATA%\CodexChannelLauncher\profiles\work";
+        ProfilePathText.ToolTip = ProfilePathText.Text;
+        OverviewSkillCountText.Text = "12";
+        OverviewMcpCountText.Text = "4";
+        OverviewSnapshotCountText.Text = "8";
+        OverviewChromeText.Text = "Chrome · 已启用";
+        OverviewComputerText.Text = "电脑操作 · 已启用";
+        OverviewPermissionText.Text = "on-request · workspace-write";
+        OverviewMemoryText.Text = "Memories · 已启用";
+        FullAccessWarning.Visibility = Visibility.Collapsed;
+        FooterStateDot.Fill = Brush("#65DFB2");
+        FooterStatusText.Text = "预览数据 · 不读取或修改本机配置";
     }
 
     private sealed record ConfigurationViewData(

@@ -158,6 +158,38 @@ public sealed class WorkProfileManagerTests
     }
 
     [Fact]
+    public void CompanyAppCodexHomeMarkerIsMigratedInPlaceWithConversationState()
+    {
+        using var fixture = new TestFixture();
+        var home = fixture.CreateLegacyCandidate(
+            "taishi",
+            "legacy-key",
+            "company-app-codex-home");
+        var profileRoot = Directory.GetParent(home)!.FullName;
+        var session = Path.Combine(home, "sessions", "legacy-thread.jsonl");
+        var globalState = Path.Combine(home, ".codex-global-state.json");
+        var electronState = Path.Combine(profileRoot, "electron", "Default", "Preferences");
+        Directory.CreateDirectory(Path.GetDirectoryName(session)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(electronState)!);
+        File.WriteAllText(session, """{"type":"legacy-thread"}""");
+        File.WriteAllText(globalState, """{"selected-project":{"type":"local"}}""");
+        File.WriteAllText(electronState, """{"legacy-window-state":true}""");
+        var before = new Dictionary<string, string>
+        {
+            [session] = HashFile(session),
+            [globalState] = HashFile(globalState),
+            [electronState] = HashFile(electronState)
+        };
+
+        var status = fixture.Manager.GetSetupStatus();
+
+        Assert.Equal(WorkProfileSetupState.Configured, status.State);
+        Assert.Equal("taishi", status.Registration?.ProfileDirectoryName);
+        Assert.All(before, item => Assert.Equal(item.Value, HashFile(item.Key)));
+        Assert.True(File.Exists(fixture.Paths.ProfilesRegistryFile));
+    }
+
+    [Fact]
     public void MultipleLegacyMarkersAreMigratedTogetherWithDistinctColors()
     {
         using var fixture = new TestFixture();
@@ -749,7 +781,10 @@ public sealed class WorkProfileManagerTests
 
         public string FingerprintPersonalFiles() => FingerprintDirectory(Paths.PersonalCodexHome);
 
-        public string CreateLegacyCandidate(string directoryName, string apiKey)
+        public string CreateLegacyCandidate(
+            string directoryName,
+            string apiKey,
+            string authority = "legacy-isolated-profile")
         {
             var home = Path.Combine(Paths.ProfilesRoot, directoryName, "codex-home");
             Directory.CreateDirectory(home);
@@ -763,7 +798,7 @@ public sealed class WorkProfileManagerTests
                 {
                     SchemaVersion = 2,
                     InitializedAtUtc = DateTime.UtcNow,
-                    Authority = "legacy-isolated-profile"
+                    Authority = authority
                 }));
             return home;
         }

@@ -12,12 +12,12 @@
     <Product>Codex 多开器</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\CodexChannelLauncher.ico</ApplicationIcon>
-    <Version>1.5.0-preview.1</Version>
-    <FileVersion>1.5.0.1</FileVersion>
+    <Version>1.5.1-msix-preview.1</Version>
+    <FileVersion>1.5.1.0</FileVersion>
     <Authors>yyyyyp233</Authors>
     <Description>非官方 Windows Codex App 多开与隔离工作空间启动器。</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/yyyyyp233/codex-multi-launcher</RepositoryUrl>
+    <RepositoryUrl>https://github.com/kuroiii/codex-multi-launcher</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
@@ -32,6 +32,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Management" Version="10.0.10" />
     <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
     <Compile Remove="tests\**\*.cs" />
     <EmbeddedResource Remove="tests\**\*" />

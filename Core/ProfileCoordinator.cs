@@ -7,19 +7,6 @@ namespace CodexChannelLauncher.Core;
 
 public sealed class ProfileCoordinator
 {
-    private static readonly string[] ScrubbedEnvironmentVariables =
-    [
-        "CODEX_HOME",
-        "CODEX_SQLITE_HOME",
-        "CODEX_ELECTRON_USER_DATA_PATH",
-        "CODEX_API_KEY",
-        "CODEX_ACCESS_TOKEN",
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "OPENAI_API_BASE",
-        "CHATGPT_BASE_URL"
-    ];
-
     private static readonly JsonSerializerOptions ReportJsonOptions = new()
     {
         WriteIndented = true,
@@ -31,7 +18,6 @@ public sealed class ProfileCoordinator
     private readonly CompanyProfileManager profileManager;
     private readonly ProfileSnapshotService snapshotService;
     private readonly LauncherLog log;
-    private readonly CodexRuntimeCache runtimeCache;
     private readonly SemaphoreSlim launchGate = new(1, 1);
 
     public ProfileCoordinator()
@@ -42,6 +28,7 @@ public sealed class ProfileCoordinator
     public ProfileCoordinator(LauncherPaths paths)
     {
         Paths = paths ?? throw new ArgumentNullException(nameof(paths));
+        MsixUserEnvironmentLease.RecoverInterruptedLaunch();
         Paths.EnsureRuntimeDirectories();
         Paths.ValidateIsolationBoundaries();
         stateStore = new StateStore(Paths);
@@ -50,7 +37,6 @@ public sealed class ProfileCoordinator
         profileManager = new CompanyProfileManager(Paths, snapshotService);
         ConfigurationCenter = new ConfigurationCenterService(Paths, profileManager, snapshotService, packageLocator);
         MergeWorkbench = new ProfileMergeService(Paths, profileManager, snapshotService);
-        runtimeCache = new CodexRuntimeCache(Paths, log);
     }
 
     public LauncherPaths Paths { get; }
@@ -160,16 +146,13 @@ public sealed class ProfileCoordinator
 
         var roots = ProcessInventory.GetChatGptRoots();
         var ownership = ProcessInventory.ClassifyChatGptRoots(Paths, roots);
-        var state = NormalizeState(registrations, ownership, out var stateChanged);
-        if (stateChanged)
-        {
-            stateStore.Save(state);
-        }
+        // Polling is read-only. Do not overwrite a simultaneous launch/deletion state save.
+        var state = NormalizeState(registrations, ownership, out _);
 
         var validProfileIds = registrations.Select(profile => profile.ProfileId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var unresolvedManagedProcesses = ownership.Where(item =>
-                item.IsRuntimeCache &&
+                ProcessInventory.IsManaged(item) &&
                 (string.IsNullOrWhiteSpace(item.ProfileId) ||
                  !validProfileIds.Contains(item.ProfileId)))
             .ToArray();
@@ -177,10 +160,17 @@ public sealed class ProfileCoordinator
         {
             problem = CombineProblems(
                 problem,
-                "检测到无法归属到已注册空间的运行副本；在其退出前将阻止配置、删除和合并操作。");
+                "检测到目录不可读或无法归属的 Codex 实例；请先关闭测试/未知实例。其运行期间禁止新增启动及配置、删除和合并操作。");
         }
 
-        var personalRoots = ownership.Where(item => !item.IsRuntimeCache).ToArray();
+        var managedProcessIds = state.ProfileRootProcesses.Values
+            .Select(marker => marker.ProcessId)
+            .ToHashSet();
+        var personalRoots = ownership
+                .Where(item =>
+                    !ProcessInventory.IsManaged(item) &&
+                    !managedProcessIds.Contains(item.Process.ProcessId))
+                .ToArray();
         var profileStatuses = new List<ManagedProfileRuntimeStatus>();
         var selectedDirectory = Paths.WorkProfileDirectoryName;
         try
@@ -264,6 +254,11 @@ public sealed class ProfileCoordinator
                     !profile.Registration.ProfileId.Equals(registration!.ProfileId, StringComparison.OrdinalIgnoreCase)) ||
                   status.UnresolvedManagedProcessRunning;
 
+            if (status.UnresolvedManagedProcessRunning)
+            {
+                throw new InvalidOperationException("存在身份不明的 Codex 进程；请先关闭该实例，不能用并行模式绕过此检查。 ");
+            }
+
             if (otherRunning && !allowParallel)
             {
                 return new LaunchOutcome(
@@ -281,63 +276,28 @@ public sealed class ProfileCoordinator
                 return await FocusExistingAsync(channel, registration, cancellationToken);
             }
 
-            ReportProgress(new LaunchProgress("package-check", 0, "正在检查主 App 最新版本"));
-            var package = packageLocator.Locate(forceRefresh: true);
-            if (channel == ChannelKind.Company && !package.SupportsIsolatedElectronData)
-            {
-                throw new NotSupportedException(
-                    "当前 Codex App 不再暴露独立 Electron 用户目录入口。为避免污染个人实例，已拒绝启动隔离空间实例。");
-            }
-
-            string? managedExecutable = null;
+            ReportProgress(new LaunchProgress("package-check", 0, "正在检查当前用户注册的 Codex 包"));
+            var package = packageLocator.LocateFromPackageRegistration();
+            LauncherPaths? launchScope = null;
             if (registration is not null)
             {
                 ReportProgress(new LaunchProgress("profile-check", 0, $"正在检查 {registration.DisplayName} 配置"));
-                await Task.Run(() => profileManager.EnsureInitialized(registration.ProfileId), cancellationToken);
-                managedExecutable = await Task.Run(
-                    () => runtimeCache.Prepare(
-                        package,
-                        registration.ProfileId,
-                        registration.AccentColor,
-                        ReportProgress,
-                        cancellationToken),
-                    cancellationToken);
+                // Validation and startup both use an immutable, profile-specific path scope.
+                launchScope = Paths.CreateProfileScope(registration.ProfileDirectoryName);
+                var scopedManager = new CompanyProfileManager(launchScope, new ProfileSnapshotService(launchScope));
+                await Task.Run(() => scopedManager.EnsureInitialized(registration.ProfileId), cancellationToken);
             }
 
-            var beforeRoots = ProcessInventory.GetChatGptRoots();
-            var beforeIds = beforeRoots.Select(item => item.ProcessId).ToHashSet();
             var startedAt = DateTime.UtcNow;
-            ReportProgress(new LaunchProgress("process-start", 100, "正在创建独立 Codex 进程"));
-            if (registration is not null)
-            {
-                profileManager.SelectProfile(registration.ProfileId);
-            }
-
-            using var process = Process.Start(channel == ChannelKind.Company
-                                    ? CreateCompanyStartInfo(managedExecutable!)
-                                    : CreatePersonalActivationStartInfo())
-                                ?? throw new InvalidOperationException("Windows 未创建 Codex App 进程。");
-
+            var newRoot = await Task.Run(
+                () => launchScope is not null
+                    ? MsixPackageLauncher.LaunchIsolated(package, launchScope, ReportProgress, cancellationToken)
+                    : MsixPackageLauncher.LaunchPersonal(package, Paths, cancellationToken),
+                cancellationToken);
             log.Info(
-                $"Launch requested: channel={channel}, profile={registration?.ProfileId ?? "personal"}, " +
-                $"pid={process.Id}, parallel={allowParallel}, package={package.PackageVersion}");
-
-            await Task.Delay(2600, cancellationToken);
-            var afterRoots = ProcessInventory.GetChatGptRoots();
-            var newRoot = afterRoots
-                .Where(root => !beforeIds.Contains(root.ProcessId))
-                .OrderBy(root => root.StartedAtUtc)
-                .FirstOrDefault();
-            if (newRoot is null && !process.HasExited)
-            {
-                newRoot = afterRoots.FirstOrDefault(root => root.ProcessId == process.Id);
-            }
-
-            if (newRoot is null)
-            {
-                var exitDetail = process.HasExited ? $"，退出码 {process.ExitCode}" : string.Empty;
-                throw new InvalidOperationException($"Codex App 未形成新的主进程{exitDetail}。");
-            }
+                $"MSIX launch verified: channel={channel}, profile={registration?.ProfileId ?? "personal"}, " +
+                $"pid={newRoot.ProcessId}, package={package.PackageVersion}; temporary user environment restored");
+            ReportProgress(new LaunchProgress("complete", 100, "MSIX 激活检查完成，用户环境已恢复"));
 
             var state = stateStore.Load();
             state.ProfileRootProcesses ??= new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
@@ -365,7 +325,7 @@ public sealed class ProfileCoordinator
                 false,
                 channel,
                 registration is not null
-                    ? $"{registration.DisplayName} 已在独立 CODEX_HOME 与独立界面数据目录中启动。"
+                    ? $"{registration.DisplayName} 已通过 MSIX 启动，并确认目标界面目录与本次数据写入。"
                     : "个人实例已通过原始 Store 入口启动。",
                 newRoot.ProcessId,
                 registration?.ProfileId);
@@ -477,38 +437,29 @@ public sealed class ProfileCoordinator
         }
 
         var registration = ResolveRegistration(profileId);
-        profileManager.SelectProfile(registration.ProfileId);
-        var status = GetStatus();
-        var running = status.ManagedProfiles.FirstOrDefault(profile =>
-            profile.Registration.ProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase));
-        if (running?.Running != true)
+        if (!GetStatus().ManagedProfiles.Any(profile =>
+                profile.Registration.ProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase) && profile.Running))
         {
             await LaunchAsync(ChannelKind.Company, true, profileId, cancellationToken);
-            await Task.Delay(1200, cancellationToken);
         }
 
-        var state = stateStore.Load();
-        state.ProfileRootProcesses ??= new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
-        state.ProfileRootProcesses.TryGetValue(profileId, out var marker);
-        var executable = marker?.ExecutablePath;
-        if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable) ||
-            !LauncherPaths.IsUnder(executable, Paths.RuntimeCacheRoot))
+        await launchGate.WaitAsync(cancellationToken);
+        try
         {
-            var package = packageLocator.Locate(forceRefresh: true);
-            executable = await Task.Run(
-                () => runtimeCache.Prepare(
-                    package,
-                    registration.ProfileId,
-                    registration.AccentColor,
-                    ReportProgress,
-                    cancellationToken),
-                cancellationToken);
+            using var operationGate = await LauncherOperationGate.AcquireAsync(Paths, cancellationToken);
+            var root = ProcessInventory.ClassifyChatGptRoots(Paths).FirstOrDefault(item =>
+                string.Equals(item.ProfileId, profileId, StringComparison.OrdinalIgnoreCase))?.Process
+                ?? throw new InvalidOperationException("未找到可验证的目标隔离进程。 ");
+            var marker = new ProcessMarker(root.ProcessId, root.StartedAtUtc, root.ExecutablePath);
+            var scope = Paths.CreateProfileScope(registration.ProfileDirectoryName);
+            var package = packageLocator.LocateFromPackageRegistration();
+            await Task.Run(() => MsixPackageLauncher.SendDeepLink(
+                package, scope, marker, deepLink, cancellationToken), cancellationToken);
         }
-
-        profileManager.SelectProfile(registration.ProfileId);
-        using var activation = Process.Start(CreateCompanyStartInfo(executable, deepLink))
-                               ?? throw new InvalidOperationException("无法打开隔离空间 Codex 设置页。");
-        await Task.Delay(900, cancellationToken);
+        finally
+        {
+            launchGate.Release();
+        }
     }
 
     public static void WriteReport<T>(string destination, T report)
@@ -573,7 +524,10 @@ public sealed class ProfileCoordinator
         foreach (var registeredProfileId in state.ProfileRootProcesses.Keys.ToArray())
         {
             if (!validProfileIds.Contains(registeredProfileId) ||
-                !ProcessInventory.IsAlive(state.ProfileRootProcesses[registeredProfileId]))
+                !ProcessInventory.IsAlive(state.ProfileRootProcesses[registeredProfileId]) ||
+                !ownership.Any(item =>
+                    item.Process.ProcessId == state.ProfileRootProcesses[registeredProfileId].ProcessId &&
+                    string.Equals(item.ProfileId, registeredProfileId, StringComparison.OrdinalIgnoreCase)))
             {
                 state.ProfileRootProcesses.Remove(registeredProfileId);
                 changed = true;
@@ -581,7 +535,7 @@ public sealed class ProfileCoordinator
         }
 
         foreach (var item in ownership.Where(item =>
-                     item.IsRuntimeCache &&
+                     ProcessInventory.IsManaged(item) &&
                      !string.IsNullOrWhiteSpace(item.ProfileId) &&
                      validProfileIds.Contains(item.ProfileId)))
         {
@@ -605,80 +559,26 @@ public sealed class ProfileCoordinator
         return state;
     }
 
-    private async Task<LaunchOutcome> FocusExistingAsync(
+    private Task<LaunchOutcome> FocusExistingAsync(
         ChannelKind channel,
         ManagedProfileRegistration? registration,
         CancellationToken cancellationToken)
     {
-        if (channel == ChannelKind.Personal)
-        {
-            using var activation = Process.Start(CreatePersonalActivationStartInfo());
-            await Task.Delay(700, cancellationToken);
-            return new LaunchOutcome(
-                false,
-                true,
-                false,
-                channel,
-                "已通过原始 Store 入口聚焦个人 Codex。",
-                activation?.Id ?? 0);
-        }
-
-        var state = stateStore.Load();
-        state.ProfileRootProcesses ??= new Dictionary<string, ProcessMarker>(StringComparer.OrdinalIgnoreCase);
-        state.ProfileRootProcesses.TryGetValue(registration!.ProfileId, out var marker);
+        cancellationToken.ThrowIfCancellationRequested();
+        var root = ProcessInventory.ClassifyChatGptRoots(Paths).FirstOrDefault(item =>
+            channel == ChannelKind.Personal
+                ? !ProcessInventory.IsManaged(item)
+                : string.Equals(item.ProfileId, registration!.ProfileId, StringComparison.OrdinalIgnoreCase))?.Process;
+        var marker = root is null ? null : new ProcessMarker(root.ProcessId, root.StartedAtUtc, root.ExecutablePath);
         var focused = ProcessInventory.TryFocus(marker);
-        if (!focused && marker is not null && LauncherPaths.IsUnder(marker.ExecutablePath, Paths.RuntimeCacheRoot))
-        {
-            profileManager.SelectProfile(registration.ProfileId);
-            using var activation = Process.Start(CreateCompanyStartInfo(marker.ExecutablePath));
-            await Task.Delay(900, cancellationToken);
-            focused = ProcessInventory.TryFocus(marker) || activation is not null;
-        }
-
-        return new LaunchOutcome(
+        return Task.FromResult(new LaunchOutcome(
             false,
             focused,
             false,
             channel,
-            focused ? $"已请求显示并聚焦 {registration.DisplayName}。" : $"{registration.DisplayName} 已在后台运行，请从任务栏切换窗口。",
-            marker?.ProcessId ?? 0,
-            registration.ProfileId);
-    }
-
-    private static ProcessStartInfo CreatePersonalActivationStartInfo()
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "explorer.exe",
-            UseShellExecute = false
-        };
-        startInfo.ArgumentList.Add(@"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App");
-        return startInfo;
-    }
-
-    private ProcessStartInfo CreateCompanyStartInfo(string executablePath, string? deepLink = null)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = executablePath,
-            WorkingDirectory = Path.GetDirectoryName(executablePath)!,
-            UseShellExecute = false
-        };
-        startInfo.ArgumentList.Add($"--user-data-dir={Paths.CompanyElectronData}");
-        if (!string.IsNullOrWhiteSpace(deepLink))
-        {
-            startInfo.ArgumentList.Add(deepLink);
-        }
-
-        foreach (var variable in ScrubbedEnvironmentVariables)
-        {
-            startInfo.Environment.Remove(variable);
-        }
-
-        startInfo.Environment["CODEX_HOME"] = Paths.CompanyCodexHome;
-        startInfo.Environment["CODEX_SQLITE_HOME"] = Paths.CompanyCodexHome;
-        startInfo.Environment["CODEX_ELECTRON_USER_DATA_PATH"] = Paths.CompanyElectronData;
-        return startInfo;
+            focused ? "已聚焦目标 Codex 窗口。" : "未重新启动进程。请从目标 Codex 的托盘图标或任务栏恢复窗口。",
+            root?.ProcessId ?? 0,
+            registration?.ProfileId));
     }
 
     private void ReportProgress(LaunchProgress progress) => ProgressChanged?.Invoke(this, progress);

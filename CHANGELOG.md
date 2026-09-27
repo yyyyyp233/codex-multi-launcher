@@ -2,6 +2,36 @@
 
 所有显著变化会记录在此文件。版本遵循语义化版本约定；Preview 版本可能调整本机数据格式和兼容策略。
 
+
+## [1.5.1-msix-preview.1] - 2026-09-27
+
+### Added
+
+- Windows MSIX/AppX package-identity launch path for isolated profiles using `IApplicationActivationManager`.
+- Per-user environment transaction/recovery journal for temporary `CODEX_HOME` and `CODEX_SQLITE_HOME` switching.
+- Process package/command-line inspection and conservative Profile ownership recovery.
+- `tools/Restore-MsixEnvironment.ps1` for manual recovery after abnormal launcher termination.
+- MSIX regression tests and public architecture/compatibility documentation.
+
+### Changed
+
+- Isolated profiles no longer launch copied/unpackaged Codex App runtime variants; the registered official package identity is preserved.
+- Electron isolation is passed through an absolute `--user-data-dir`; Codex Home isolation is verified before the user environment is restored.
+- Managed process detection now correlates PID, creation time, package identity, command line, registered Electron directory and Profile marker instead of relying on the runtime-cache executable path.
+- Source version advanced to `1.5.1-msix-preview.1`.
+
+### Validation
+
+- OpenAI.Codex `26.924.2738.0` on Windows x64.
+- Release build passed.
+- xUnit: 61 passed, 0 failed, 0 skipped.
+- Manual acceptance: personal profile, existing isolated profile, concurrent personal + isolated operation, launcher restart/re-identification, isolated close/relaunch.
+
+### Known limitations
+
+- The launch transaction briefly changes user-level `CODEX_HOME` / `CODEX_SQLITE_HOME`. Unrelated Codex/Codex CLI launches outside this launcher's lock must not be started during that short activation window.
+- Future Codex Desktop releases may change the currently used integration surfaces.
+- The MSIX path does not provide per-profile tray-icon badge variants.
 ## [1.5.0-preview.1] - 2026-07-22
 
 ### Added
